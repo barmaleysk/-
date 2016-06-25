@@ -603,7 +603,7 @@ class MainConvo(MarketBotConvo):
             TextDetail('shop.name', name='название магазина'),
             TokenDetail('shop.token', name='токен для телеграм бота'),
             EmailDetail('shop.email', name='email для приема заказов'),
-            FileDetail('shop.items', name='файл с описанием товаров')
+            FileDetail('shop.items', name='файл с описанием товаров <a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>')
         ], final_message='Магазин создан!')
         self.main_view = NavigationView(self.ctx, links={"Добавить магазин": self.add_view, "Настройки": self.add_view}, msg="Главное меню")
         self.add_view.next_view = self.main_view
