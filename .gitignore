@@ -1,0 +1,5 @@
+venv
+*.pyc
+pyTelegramBotAPI
+main.py
+*.DS_Store
