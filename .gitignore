@@ -4,3 +4,4 @@ pyTelegramBotAPI
 main.py
 *.DS_Store
 *.pem
+*.env

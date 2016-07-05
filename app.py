@@ -9,9 +9,26 @@ import pickle
 from collections import defaultdict
 from pymongo import MongoClient
 from threading import Thread
+import sendgrid
+import os
+from sendgrid.helpers.mail import *
+
+sg = sendgrid.SendGridAPIClient(apikey=os.environ.get('SENDGRID_API_KEY'))
 
 def send_order(mail, order):
-    pass
+    from_email = Email("order@botmarket.com")
+    subject = "Новый заказ!"
+    to_email = Email(mail)
+    res = 'Заказ\n====\n\n\n'
+    res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in order['items'] )
+    res += '\n-----\n Итого: ' + str(order['total']) + ' руб.'
+    res += '\n-----\n Детали доставки: \n'
+    res += '\n\n'.join(k + ': ' + v for k,v in order['delivery'].items())
+    res = res.replace('Ваш', '')
+    content = Content("text/plain", res)
+    mail = Mail(from_email, subject, to_email, content)
+    response = sg.client.mail.send.post(request_body=mail.get())
+
 
 
 def mk_inline_markup(command_list):
@@ -33,6 +50,7 @@ def BTN(txt, request_contact=None):
 class Context(object):
     def __init__(self, bot):
         self.bot = bot.bot
+        self.email = bot.email
         self._db = bot.get_db()
         self.chat_id = None
         self.views = {}
@@ -377,6 +395,9 @@ class DetailsView(View):
         self.ptr = 0
         super(DetailsView, self).activate()
 
+    def prefinalize(self):
+        pass
+
     def finalize(self):
         pass
 
@@ -420,6 +441,7 @@ class DetailsView(View):
             self.render()
         else:
             self.filled = True
+            self.prefinalize()
             self.render()
             self.next_view.activate()
             self.finalize()
@@ -464,9 +486,16 @@ class OrderCreatorView(DetailsView):
         self.ctx._db.orders.insert_one(order)
         self.ctx.current_basket.__init__(self.ctx.current_basket.menu)
         self.ctx.orders.append(order)
+        send_order(self.ctx.email, order)
 
 
 class BotCreatorView(DetailsView):
+    def prefinalize(self):
+        dd = {} # TODO
+        for d in self.details:
+            dd[d.id] = d.value
+        self.final_message += '\n Ссылка на бота: @' + telebot.TeleBot(dd['shop.token']).get_me().username.encode('utf-8')
+
     def finalize(self):
         dd = {}
         for d in self.details:
@@ -506,7 +535,13 @@ class HistoryItem(object):
         res = '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in self.order['items'] )
         res += '\n-----\n Итого: ' + str(self.order['total']) + ' руб.'
         res += '\n-----\n Детали доставки: \n-----\n'
-        res += '\n'.join(k.encode('utf-8') + ': ' + v.encode('utf-8') for k,v in self.order['delivery'].items())
+        try:
+            res += '\n'.join(k.encode('utf-8') + ': ' + v.encode('utf-8') for k,v in self.order['delivery'].items())
+        except:
+            try:
+                res += '\n'.join(k + ': ' + v for k,v in self.order['delivery'].items())
+            except:
+                pass
         return res
 
 
@@ -642,6 +677,7 @@ class MarketBot(object):
         self.data = data
         self.convos = {}
         self.db = None
+        self.email = data.get('email')
 
     def get_db(self):
         self.db = self.db or MongoClient('localhost', 27017)
