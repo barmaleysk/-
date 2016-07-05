@@ -10,12 +10,14 @@ from collections import defaultdict
 from pymongo import MongoClient
 from threading import Thread
 import sendgrid
+from multiprocessing import Process
 import os
 from sendgrid.helpers.mail import *
 
 sg = sendgrid.SendGridAPIClient(apikey=os.environ.get('SENDGRID_API_KEY'))
 
 def send_order(mail, order):
+    pass
     from_email = Email("order@botmarket.com")
     subject = "Новый заказ!"
     to_email = Email(mail)
@@ -81,6 +83,7 @@ class Context(object):
             self.current_view.process_message(txt)
 
     def process_callback(self, callback):
+        print self, callback
         if self.current_view:
             self.current_view.process_callback(callback)
 
@@ -112,7 +115,7 @@ class View(object):
             msg = self.ctx.send_message(self.get_msg(), self.get_markup())
             if msg and self.editable:
                 self.ctx.views[self] = msg.message_id
-                print msg.message_id, self.ctx.views
+                print msg.message_id, self.ctx, self.ctx.views
         else:
             print 'edit'
             self.ctx.edit_message(self.ctx.views[self], self.get_msg(), self.get_markup())
@@ -130,14 +133,14 @@ class View(object):
 
 
 class ItemNode(View):
-    def __init__(self, menu_item, id, ctx, menu):
+    def __init__(self, menu_item, _id, ctx, menu):
         self.editable = True
         self.description = menu_item['desc']
         self.img = menu_item['img']
         self.count = 0
         self.price = int(menu_item['price'])
         self.name = menu_item['name']
-        self.id = id
+        self._id = _id
         self.ctx = ctx
         self.ordered = False
         self.menu = menu
@@ -153,10 +156,10 @@ class ItemNode(View):
         return res
 
     def get_add_callback(self):
-        return 'menu_item:' + str(self.id) + ':add'
+        return 'menu_item:' + str(self._id) + ':add'
 
     def get_basket_callback(self):
-        return 'menu_item:' + str(self.id) + ':basket'
+        return 'menu_item:' + str(self._id) + ':basket'
 
     def sub(self):
         self.count -= 1
@@ -325,8 +328,8 @@ class MenuNode(View):
 
 
 class Detail(object):
-    def __init__(self, id, default_options=[], name='', value=None, ctx=None):
-        self.id = id
+    def __init__(self, _id, default_options=[], name='', value=None, ctx=None):
+        self._id = _id
         self.default_options = default_options
         self.name = name
         self.value = value
@@ -427,7 +430,7 @@ class DetailsView(View):
             markup = types.ReplyKeyboardMarkup()
             if self.current().is_filled() or isinstance(self.current(), FileDetail):
                 markup.row(BTN('ОК'))
-            if self.current().id == 'phone':
+            if self.current()._id == 'phone':
                 markup.row(BTN('отправить номер', True))
             if len(self.current().default_options) > 0:
                 markup.row(*[BTN(opt) for opt in self.current().default_options])
@@ -499,17 +502,17 @@ class BotCreatorView(DetailsView):
     def prefinalize(self):
         dd = {} # TODO
         for d in self.details:
-            dd[d.id] = d.value
+            dd[d._id] = d.value
         self.final_message += '\n Ссылка на бота: @' + telebot.TeleBot(dd['shop.token']).get_me().username.encode('utf-8')
 
     def finalize(self):
         dd = {}
         for d in self.details:
-            dd[d.id] = d.value
+            dd[d._id] = d.value
         bot_data = {'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id}
         self.ctx._db.bots.save(bot_data)
         new_bot = MarketBot(bot_data)
-        Thread(target=new_bot.start).start()
+        new_bot.start()
 
 class UpdateBotView(BotCreatorView):
     def activate(self):
@@ -520,7 +523,7 @@ class UpdateBotView(BotCreatorView):
     def finalize(self):
         dd = {}
         for d in self.details:
-            dd[d.id] = d.value
+            dd[d._id] = d.value
         bot_data = {'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id}
         self.ctx._db.bots.update_one({'token': dd['shop.token']}, {"$set": bot_data})
 
@@ -616,6 +619,7 @@ class InlineNavigationView(View):
 
     def add_child(self, cmd, ch_view):
         self.links[cmd] = ch_view
+        print cmd, ch_view
 
 
 class MarketBotConvo(object):
@@ -724,10 +728,12 @@ class MarketBot(object):
         self.bot.add_message_handler(self.process_message, func=lambda message: True, content_types=['text', 'contact'])
 
     def get_convo(self, chat_id):
+        print self.convos
         if chat_id not in self.convos:
             convo_data = {'chat_id': chat_id, 'bot_token': self.token}
             convo_data = dict(self.data.items() + convo_data.items())
             self.convos[chat_id] = self.convo_type(convo_data, self)
+        print 'chat_id', chat_id, self.convos[chat_id].ctx
         return self.convos[chat_id]
 
     def goto_main(self, message):
@@ -735,6 +741,7 @@ class MarketBot(object):
         convo.goto_main()
 
     def process_callback(self, callback):
+        print callback.message.chat.id
         convo = self.get_convo(callback.message.chat.id)
         convo.process_callback(callback)
 
@@ -750,7 +757,7 @@ class MarketBot(object):
 
     def start(self):
         self._init_bot()
-        self.bot.polling()
+        Process(target=self.bot.polling).start()
 
 
 class MasterBot(MarketBot):
@@ -760,8 +767,8 @@ class MasterBot(MarketBot):
         self._init_bot()
         for bot_data in self.get_db().bots.find():
             m = MarketBot(bot_data)
-            Thread(target=m.start).start()
-        self.bot.polling()
+            m.start()
+        Process(target=self.bot.polling).start()
 
 
 mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})
