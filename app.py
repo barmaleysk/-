@@ -8,49 +8,10 @@ from validate_email import validate_email
 import pickle
 from collections import defaultdict
 from pymongo import MongoClient
-
-
-client = MongoClient('localhost', 27017)
-db =  client['marketbot']
+from multiprocessing import Process
 
 def send_order(mail, order):
     pass
-
-bot_store = {}
-
-
-class BotWrapper(object):
-    def __init__(self, token):
-        self.token = token
-
-    def _bot(self):
-        global bot_store
-        if self.token not in bot_store:
-            bot_store[self.token] = telebot.TeleBot(self.token)
-        return bot_store[self.token]
-
-    def send_message(self, chat_id, msg, reply_markup, parse_mode):
-        return self._bot().send_message(chat_id, msg, reply_markup=reply_markup, parse_mode=parse_mode)
-
-    def edit_message_text(self, msg, chat_id, message_id, reply_markup, parse_mode):
-        return self._bot().edit_message_text(msg, chat_id=chat_id, message_id=message_id, reply_markup=reply_markup, parse_mode=parse_mode)
-
-    def add_message_handler(self, f, commands=None, content_types=None, func=None, regexp=None):
-        self._bot().add_message_handler(f, commands=commands, func=func, content_types=content_types, regexp=regexp)
-
-    def add_callback_query_handler(self, f, func):
-        self._bot().add_callback_query_handler(f, func=func)
-
-    def polling(self):
-        print self._bot()
-        print self.token
-        self._bot().polling()
-
-    def get_file(self, file_id):
-        return self._bot().get_file(file_id)
-
-    def download_file(self, file_path):
-        return self._bot().download_file(file_path)
 
 
 def mk_inline_markup(command_list):
@@ -71,7 +32,8 @@ def BTN(txt, request_contact=None):
 
 class Context(object):
     def __init__(self, bot):
-        self.bot = bot
+        self.bot = bot.bot
+        self._db = bot.get_db()
         self.chat_id = None
         self.views = {}
         self.current_view = None
@@ -232,7 +194,7 @@ class BasketNode(View):
         return filter(lambda i: i.ordered is True, self.menu.items.values())
 
     def activate(self):
-        self.items = self.get_ordered_items()
+        self.items = list(set(self.items +  self.get_ordered_items()))
         self.item_ptr = 0
 
     def current_item(self):
@@ -308,7 +270,7 @@ class MenuNode(View):
     def __init__(self, menu_items, ctx, links):
         self.ctx = ctx
         self.items = {}
-        self.basket = ctx.current_basket or BasketNode(self)
+        self.basket = self.ctx.current_basket or BasketNode(self)
         self.links = links
         cnt = 0
         for item in menu_items:
@@ -319,6 +281,9 @@ class MenuNode(View):
     def render(self):
         for item in self.items.values():
             item.render()
+
+    def process_message(self, message):
+        self.ctx.main_view.process_message(message)
 
     def process_callback(self, call):  # route callback to item node
         data = call.data.encode('utf-8')
@@ -336,6 +301,7 @@ class MenuNode(View):
                 self.links[ll].activate()
 
     def goto_basket(self, call):
+        self.basket.menu = self
         self.basket.activate()
         self.basket.render()
 
@@ -363,6 +329,8 @@ class TextDetail(Detail):
 
 class TokenDetail(TextDetail):
     def validate(self, value):
+        if self.ctx._db.bots.find_one({'token': value}) is not None:
+            return False
         try:
             b = telebot.TeleBot(value)
             b.get_me()
@@ -489,9 +457,10 @@ class OrderCreatorView(DetailsView):
     def finalize(self):
         print str(self.ctx.current_basket)
         order = self.ctx.current_basket.to_dict()
+        order['delivery'] = {}
         for d in self.details:
-            order[d.name] = d.txt()
-        db.orders.insert_one(order)
+            order['delivery'][d.name] = d.txt()
+        self.ctx._db.orders.insert_one(order)
         self.ctx.current_basket.__init__(self.ctx.current_basket.menu)
         self.ctx.orders.append(order)
 
@@ -502,9 +471,8 @@ class BotCreatorView(DetailsView):
         for d in self.details:
             dd[d.id] = d.value
         bot_data = {'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id}
-        db.bots.save(bot_data)
+        self.ctx._db.bots.save(bot_data)
         new_bot = MarketBot(bot_data)
-        self.ctx.bots[new_bot.token] = new_bot
         new_bot.start()
 
 
@@ -529,10 +497,25 @@ class NavigationView(View):
             self.links[message].activate()
 
 
+class HistoryItem(object):
+    def __init__(self, order):
+        self.order = order
+
+    def __str__(self):
+        res = '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in self.order['items'] )
+        res += '\n-----\n Итого: ' + str(self.order['total']) + ' руб.'
+        res += '\n-----\n Детали доставки: \n-----\n'
+        res += '\n'.join(k.encode('utf-8') + ': ' + v.encode('utf-8') for k,v in self.order['delivery'].items())
+        return res
+
+
+
 class HistoryView(NavigationView):
     def get_msg(self):
         if len(self.ctx.orders) > 0:
-            return '\n-----------\n'.join([str(order) for order in self.ctx.orders])
+            for order in self.ctx.orders:
+                self.ctx.send_message(str(HistoryItem(order)))
+            return ':)'
         else:
             return 'История заказов пуста'
 
@@ -553,6 +536,10 @@ class InlineNavigationView(View):
             markup.row(btn(k, callback_data=k))
         return markup
 
+
+    def process_message(self, message):
+        self.ctx.main_view.process_message(message)
+
     def process_callback(self, callback):
         cmd = callback.data.encode('utf-8')
         print cmd, self.links.keys()
@@ -565,9 +552,9 @@ class InlineNavigationView(View):
 
 class MarketBotConvo(object):
     def __init__(self, data, bot):
-        self.ctx = Context(bot.bot)
+        self.ctx = Context(bot)
         self.ctx.chat_id = data['chat_id']
-        self.ctx.orders = list(db.orders.find({'chat_id': data['chat_id']}))
+        self.ctx.orders = list(self.ctx._db.orders.find({'chat_id': data['chat_id']}))
 
         self.delivery_view = OrderCreatorView(self.ctx, [
             TextDetail('delivery_type', ['Доставка до дома', 'Самовывоз'], name='тип доставки'),
@@ -586,7 +573,7 @@ class MarketBotConvo(object):
 
         # self.menu_view = MenuNode(data, self.ctx, links={"delivery": self.delivery_view})
         self.history_view = HistoryView(self.ctx)
-        self.main_view = NavigationView(self.ctx, links={"Меню": self.menu_cat_view, "История": self.history_view}, msg="Главное меню")
+        self.main_view = self.ctx.main_view = NavigationView(self.ctx, links={"Меню": self.menu_cat_view, "История": self.history_view}, msg="Главное меню")
         self.history_view.links = {"Главное меню": self.main_view}
         self.history_view.main_view = self.main_view
         self.delivery_view.next_view = self.main_view
@@ -607,9 +594,9 @@ class MarketBotConvo(object):
 
 class MainConvo(MarketBotConvo):
     def __init__(self, data, bot):
-        self.ctx = Context(bot.bot)
+        self.ctx = Context(bot)
         self.ctx.chat_id = data['chat_id']
-        self.ctx.bots = {bot_data['chat_id']: MarketBot(bot_data) for bot_data in db.bots.find({'chat_id': data['chat_id']})}
+        self.ctx.bots = {bot_data['chat_id']: MarketBot(bot_data) for bot_data in self.ctx._db.bots.find({'chat_id': data['chat_id']})}
 
         self.add_view = BotCreatorView(self.ctx, [
             TextDetail('shop.name', name='название магазина'),
@@ -653,13 +640,15 @@ class MarketBot(object):
         self.token = data['token']    
         self.data = data
         self.convos = {}
-        self._init_bot()
+        self.db = None
 
-        for convo_data in db.convos.find({'bot_token': self.token}):
-            self.convos[convo_data['chat_id']] = self.convo_type(dict(self.data.items() + convo_data.items()), self)
+    def get_db(self):
+        self.db = self.db or MongoClient('localhost', 27017)
+        return self.db['marketbot']
 
-    def _init_bot(self):
-        self.bot = BotWrapper(self.token)
+
+    def _init_bot(self, threaded=False):
+        self.bot = telebot.TeleBot(self.token, threaded=threaded)
         self.bot.add_message_handler(self.goto_main, commands=['start'])
         self.bot.add_callback_query_handler(self.process_callback, func=lambda call: True)
         self.bot.add_message_handler(self.process_file, content_types=['document'])
@@ -668,7 +657,6 @@ class MarketBot(object):
     def get_convo(self, chat_id):
         if chat_id not in self.convos:
             convo_data = {'chat_id': chat_id, 'bot_token': self.token}
-            db.convos.insert_one(convo_data)
             convo_data = dict(self.data.items() + convo_data.items())
             self.convos[chat_id] = self.convo_type(convo_data, self)
         return self.convos[chat_id]
@@ -700,14 +688,13 @@ class MasterBot(MarketBot):
     convo_type = MainConvo
 
     def start(self):
-        for convo in self.convos.values():
-            for bot in convo.ctx.bots.values():
-                bot.start()
+        self._init_bot()
+        for bot_data in self.get_db().bots.find():
+            m = MarketBot(bot_data)
+            Process(target=m.start).start()
         self.bot.polling()
 
-# try:
-#     mb = pickle.load(open("203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw", 'rb'))
-# except:
+
 mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})
 mb.start()
 

@@ -1,3 +1,3 @@
 from mongoengine import *
 
-connect('tumblelog')
+connect('marketbot')
