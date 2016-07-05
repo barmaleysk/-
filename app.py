@@ -8,7 +8,7 @@ from validate_email import validate_email
 import pickle
 from collections import defaultdict
 from pymongo import MongoClient
-from multiprocessing import Process
+from threading import Thread
 
 def send_order(mail, order):
     pass
@@ -307,11 +307,12 @@ class MenuNode(View):
 
 
 class Detail(object):
-    def __init__(self, id, default_options=[], name='', value=None):
+    def __init__(self, id, default_options=[], name='', value=None, ctx=None):
         self.id = id
         self.default_options = default_options
         self.name = name
         self.value = value
+        self.ctx = ctx
 
     def is_filled(self):
         return self.value is not None
@@ -473,7 +474,7 @@ class BotCreatorView(DetailsView):
         bot_data = {'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id}
         self.ctx._db.bots.save(bot_data)
         new_bot = MarketBot(bot_data)
-        new_bot.start()
+        Thread(target=new_bot.start).start()
 
 
 class NavigationView(View):
@@ -557,10 +558,10 @@ class MarketBotConvo(object):
         self.ctx.orders = list(self.ctx._db.orders.find({'chat_id': data['chat_id']}))
 
         self.delivery_view = OrderCreatorView(self.ctx, [
-            TextDetail('delivery_type', ['Доставка до дома', 'Самовывоз'], name='тип доставки'),
-            TextDetail('address', name='Ваш адрес'),
-            TextDetail('phone', name='Ваш телефон'),
-            TextDetail('delivery_time', name='желаемое время доставки')
+            TextDetail('delivery_type', ['Доставка до дома', 'Самовывоз'], name='тип доставки', ctx=self.ctx),
+            TextDetail('address', name='Ваш адрес', ctx=self.ctx),
+            TextDetail('phone', name='Ваш телефон', ctx=self.ctx),
+            TextDetail('delivery_time', name='желаемое время доставки', ctx=self.ctx)
         ], final_message='Заказ сформирован!')
 
         self.menu_cat_view = InlineNavigationView(self.ctx, msg="Выберите категорию:")
@@ -599,9 +600,9 @@ class MainConvo(MarketBotConvo):
         self.ctx.bots = {bot_data['chat_id']: MarketBot(bot_data) for bot_data in self.ctx._db.bots.find({'chat_id': data['chat_id']})}
 
         self.add_view = BotCreatorView(self.ctx, [
-            TextDetail('shop.name', name='название магазина'),
-            TokenDetail('shop.token', name='токен для телеграм бота'),
-            EmailDetail('shop.email', name='email для приема заказов'),
+            TextDetail('shop.name', name='название магазина', ctx=self.ctx),
+            TokenDetail('shop.token', name='токен для телеграм бота', ctx=self.ctx),
+            EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx),
             FileDetail('shop.items', name='файл с описанием товаров <a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>')
         ], final_message='Магазин создан!')
         self.main_view = NavigationView(self.ctx, links={"Добавить магазин": self.add_view, "Настройки": self.add_view}, msg="Главное меню")
@@ -691,7 +692,7 @@ class MasterBot(MarketBot):
         self._init_bot()
         for bot_data in self.get_db().bots.find():
             m = MarketBot(bot_data)
-            Process(target=m.start).start()
+            Thread(target=m.start).start()
         self.bot.polling()
 
 
