@@ -413,7 +413,13 @@ class DetailsView(View):
         else:
             res = 'Укажите ' + self.current().name
             if self.current().is_filled():
-                res += ' ( Сейчас: ' + self.current().value + ' )'
+                try:
+                    res += ' ( Сейчас: ' + self.current().value + ' )'
+                except:
+                    try:
+                        res += ' ( Сейчас: ' + self.current().value.encode('utf-8') + ' )'
+                    except:
+                        pass
             return res
 
     def get_markup(self):
@@ -505,6 +511,19 @@ class BotCreatorView(DetailsView):
         new_bot = MarketBot(bot_data)
         Thread(target=new_bot.start).start()
 
+class UpdateBotView(BotCreatorView):
+    def activate(self):
+        self.filled = False
+        self.ptr = 0
+        super(DetailsView, self).activate()
+
+    def finalize(self):
+        dd = {}
+        for d in self.details:
+            dd[d.id] = d.value
+        bot_data = {'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id}
+        self.ctx._db.bots.update_one({'token': dd['shop.token']}, {"$set": bot_data})
+
 
 class NavigationView(View):
     def __init__(self, ctx, links={}, msg=""):
@@ -525,6 +544,19 @@ class NavigationView(View):
         print message
         if message in self.links:
             self.links[message].activate()
+
+
+class BotSettingsView(NavigationView):
+    def activate(self):
+        self.links = {}
+        for bot in self.ctx._db.bots.find({'chat_id': self.ctx.chat_id}):
+            self.links['@' + telebot.TeleBot(bot['token']).get_me().username] = UpdateBotView(self.ctx, [
+                TokenDetail('shop.token', name='API token. Для этого перейдите в @BotFather и нажмите /newbot для создания бота. Придумайте название бота (должно быть на русском языке) и ссылку на бот (на английском языке и заканчиваться на bot). Далее вы увидите API token, который нужно скопировать и отправить в чат @BotMarket.', ctx=self.ctx, value=bot['token']),
+                EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
+                FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров <a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>')
+        ], final_message='Магазин сохранен!', main_view=self.ctx.main_view, next_view=self)
+        self.links['Главное меню'] = self.ctx.main_view
+        super(BotSettingsView, self).activate()
 
 
 class HistoryItem(object):
@@ -635,12 +667,12 @@ class MainConvo(MarketBotConvo):
         self.ctx.bots = {bot_data['chat_id']: MarketBot(bot_data) for bot_data in self.ctx._db.bots.find({'chat_id': data['chat_id']})}
 
         self.add_view = BotCreatorView(self.ctx, [
-            TextDetail('shop.name', name='название магазина', ctx=self.ctx),
-            TokenDetail('shop.token', name='токен для телеграм бота', ctx=self.ctx),
+            TokenDetail('shop.token', name='API token. Для этого перейдите в @BotFather и нажмите /newbot для создания бота. Придумайте название бота (должно быть на русском языке) и ссылку на бот (на английском языке и заканчиваться на bot). Далее вы увидите API token, который нужно скопировать и отправить в чат @BotMarket.', ctx=self.ctx),
             EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx),
             FileDetail('shop.items', name='файл с описанием товаров <a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>')
         ], final_message='Магазин создан!')
-        self.main_view = NavigationView(self.ctx, links={"Добавить магазин": self.add_view, "Настройки": self.add_view}, msg="Главное меню")
+        self.settings_view = BotSettingsView(self.ctx, msg='Настройки')
+        self.ctx.main_view = self.main_view = NavigationView(self.ctx, links={"Добавить магазин": self.add_view, "Настройки": self.settings_view}, msg="Главное меню")
         self.add_view.next_view = self.main_view
         self.add_view.main_view = self.main_view
 
