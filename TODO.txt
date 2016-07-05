@@ -1,0 +1,7 @@
+Model(object):
+    def __init__(self, data):
+        pass
+
+    def create
+    def save
+    def update
