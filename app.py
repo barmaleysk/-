@@ -8,11 +8,14 @@ from validate_email import validate_email
 import pickle
 from collections import defaultdict
 from pymongo import MongoClient
+import pymongo
 from threading import Thread
 import sendgrid
 from multiprocessing import Process
 import os
 from sendgrid.helpers.mail import *
+from datetime import datetime
+
 
 sg = sendgrid.SendGridAPIClient(apikey=os.environ.get('SENDGRID_API_KEY'))
 
@@ -41,6 +44,13 @@ def mk_inline_markup(command_list):
     return markup
 
 
+def mk_markup(command_list):
+    markup = types.ReplyKeyboardMarkup()
+    for cmd in command_list:
+        markup.row(BTN(cmd))
+    return markup
+
+
 def btn(txt, callback_data):
     return types.InlineKeyboardButton(txt, callback_data=callback_data)
 
@@ -52,6 +62,7 @@ def BTN(txt, request_contact=None):
 class Context(object):
     def __init__(self, bot):
         self.bot = bot.bot
+        self.token = bot.token
         self.email = bot.email
         self._db = bot.get_db()
         self.chat_id = None
@@ -328,10 +339,11 @@ class MenuNode(View):
 
 
 class Detail(object):
-    def __init__(self, _id, default_options=[], name='', value=None, ctx=None):
+    def __init__(self, _id, default_options=[], name='', desc='', value=None, ctx=None):
         self._id = _id
         self.default_options = default_options
         self.name = name
+        self.desc = desc
         self.value = value
         self.ctx = ctx
 
@@ -410,19 +422,21 @@ class DetailsView(View):
     def get_msg(self):
         if self.filled:
             res = self.final_message + '\n'
-            for d in self.details:
-                res += (d.name + ": " + d.txt() + '\n')
+            if not isinstance(self, BotCreatorView):  # TODO /hack
+                for d in self.details:
+                    res += (d.name + ": " + d.txt() + '\n')
             return res
         else:
             res = 'Укажите ' + self.current().name
             if self.current().is_filled():
                 try:
-                    res += ' ( Сейчас: ' + self.current().value + ' )'
+                    res += '\n(Сейчас: ' + self.current().value + ' )'
                 except:
                     try:
-                        res += ' ( Сейчас: ' + self.current().value.encode('utf-8') + ' )'
+                        res += '\n(Сейчас: ' + self.current().value.encode('utf-8') + ' )'
                     except:
                         pass
+            res += '\n' + self.current().desc
             return res
 
     def get_markup(self):
@@ -486,15 +500,48 @@ class DetailsView(View):
 
 
 class OrderCreatorView(DetailsView):
+    def __init__(self, ctx, details, next_view=None, main_view=None, final_message=""):
+        super(OrderCreatorView, self).__init__(ctx, details, next_view, main_view, final_message)
+        if len(self.ctx.orders) > 0:
+            last_order = self.ctx.orders[0]['delivery']
+            print last_order.get('тип доставки'.decode('utf-8'))
+        else:
+            last_order = {}
+
+        def _get(v):
+            try:
+                return last_order.get(v.decode('utf-8')).encode('utf-8')
+            except:
+                return last_order.get(v.decode('utf-8'))
+
+        self.details = [
+            TextDetail('delivery_type', ['Доставка до дома', 'Самовывоз'], name='тип доставки', ctx=self.ctx, value=_get('тип доставки')),
+            TextDetail('address', name='Ваш адрес', ctx=self.ctx, value=_get('Ваш адрес') ),
+            TextDetail('phone', name='Ваш телефон', ctx=self.ctx, value=_get('Ваш телефон') ),
+            TextDetail('delivery_time', name='желаемое время доставки', ctx=self.ctx)
+        ]
+
+        for d in self.details:
+            print d.value, d.is_filled()
+
+    def activate(self):
+        self.filled = False
+        self.ptr = 0
+        super(DetailsView, self).activate()
+
     def finalize(self):
         print str(self.ctx.current_basket)
         order = self.ctx.current_basket.to_dict()
         order['delivery'] = {}
         for d in self.details:
             order['delivery'][d.name] = d.txt()
+        order['date'] = datetime.utcnow()
+        order['status'] = 'В обработке'
+        order['token'] = self.ctx.token
+        order['number'] = len(self.ctx.orders) 
         self.ctx._db.orders.insert_one(order)
         self.ctx.current_basket.__init__(self.ctx.current_basket.menu)
-        self.ctx.orders.append(order)
+        self.ctx.orders = [order] + self.ctx.orders
         send_order(self.ctx.email, order)
 
 
@@ -553,10 +600,10 @@ class BotSettingsView(NavigationView):
     def activate(self):
         self.links = {}
         for bot in self.ctx._db.bots.find({'chat_id': self.ctx.chat_id}):
-            self.links['@' + telebot.TeleBot(bot['token']).get_me().username] = UpdateBotView(self.ctx, [
-                TokenDetail('shop.token', name='API token. Для этого перейдите в @BotFather и нажмите /newbot для создания бота. Придумайте название бота (должно быть на русском языке) и ссылку на бот (на английском языке и заканчиваться на bot). Далее вы увидите API token, который нужно скопировать и отправить в чат @BotMarket.', ctx=self.ctx, value=bot['token']),
+            self.links['@' + telebot.TeleBot(bot['token']).get_me().first_name] = UpdateBotView(self.ctx, [
+                TokenDetail('shop.token', name='API token', ctx=self.ctx, value=bot['token']),
                 EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
-                FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров <a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>')
+                FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>')
         ], final_message='Магазин сохранен!', main_view=self.ctx.main_view, next_view=self)
         self.links['Главное меню'] = self.ctx.main_view
         super(BotSettingsView, self).activate()
@@ -567,7 +614,8 @@ class HistoryItem(object):
         self.order = order
 
     def __str__(self):
-        res = '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in self.order['items'] )
+        res = str(self.order.get('date')).split('.')[0] + '\n\n'
+        res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in self.order['items'] )
         res += '\n-----\n Итого: ' + str(self.order['total']) + ' руб.'
         res += '\n-----\n Детали доставки: \n-----\n'
         try:
@@ -580,12 +628,27 @@ class HistoryItem(object):
         return res
 
 
-
 class HistoryView(NavigationView):
+    def activate(self):
+        self.cursor = 0
+        super(HistoryView, self).activate()
+
+    def render_5(self):
+        for order in self.ctx.orders[self.cursor:self.cursor + 5]:
+            self.ctx.send_message(str(HistoryItem(order)))
+        self.cursor += 5
+
+    def process_message(self, message):
+        print message
+
+        if message == 'Еще 5':
+            self.render_5()
+        elif message in self.links:
+            self.links[message].activate()
+
     def get_msg(self):
         if len(self.ctx.orders) > 0:
-            for order in self.ctx.orders:
-                self.ctx.send_message(str(HistoryItem(order)))
+            self.render_5()
             return ':)'
         else:
             return 'История заказов пуста'
@@ -622,19 +685,102 @@ class InlineNavigationView(View):
         print cmd, ch_view
 
 
+class OrderView(View):
+    def __init__(self, ctx, data):
+        self.ctx = ctx
+        self.data = data
+        self.editable = True
+
+    def get_msg(self):
+        res = 'Заказ #' + str(self.data['number']) + '\n'
+        res += 'Статус: ' + self.data['status'].encode('utf-8') + '\n'
+        res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in self.data['items'] )
+        res += '\n-----\n Итого: ' + str(self.data['total']) + ' руб.'
+        res += '\n-----\n Детали доставки: \n'
+        res += '\n\n'.join(k.encode('utf-8') + ': ' + v.encode('utf-8') for k,v in self.data['delivery'].items())
+        res = res.replace('Ваш', '')
+        return res
+
+    def get_markup(self):
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        if self.data['status'] == u'В обработке':
+            markup.row(btn(u'Завершить', str(self.data['number']) + ':complete'))
+        else:
+            markup.row(btn(u'Перенести в обработку', str(self.data['number'])+ ':reactivate'))
+        return markup
+
+    def process_callback(self, action):
+        if action == 'complete':
+            self.ctx._db.orders.update_one({'_id': self.data['_id']}, {'$set': {'status': 'Завершен'}})
+            self.data = self.ctx._db.orders.find_one({'_id': self.data['_id']})
+            self.render()
+        elif action == 'reactivate':
+            self.ctx._db.orders.update_one({'_id': self.data['_id']}, {'$set': {'status': 'В обработке'}})
+            self.data = self.ctx._db.orders.find_one({'_id': self.data['_id']})
+            self.render()
+
+
+class AdminOrderView(View):
+    def __init__(self, ctx, bot_token, status=u'В обработке'):
+        self.ctx = ctx
+        self.token = bot_token
+        self.editable = True
+        self.status = status
+
+    def render(self):
+        self.orders = [OrderView(self.ctx, o) for o in self.ctx._db.orders.find({'token': self.token, 'status':self.status}).sort('date', pymongo.DESCENDING)]
+        self._orders = {}
+        for o in self.orders:
+            self._orders[str(o.data['number'])] = o
+        self.ctx.send_message('Заказы', markup=mk_markup(['Еще 5', 'Главное меню']))
+        self.ptr = 0
+        self.render_5()
+
+    def render_5(self):
+        for order in self.orders[self.ptr: self.ptr + 5]:
+            order.render()
+        self.ptr += 5
+
+    def process_message(self, message):
+        if message == 'Главное меню':
+            self.ctx.main_view.activate()
+        elif message == 'Еще 5':
+            self.render_5()
+
+    def process_callback(self, callback):
+        data = callback.data.encode('utf-8')
+        number, action = data.split(':')
+        self._orders[number].process_callback(action)
+
+
+class OrderNavView(NavigationView):
+    def __init__(self, ctx, bot_token):
+        self.ctx = ctx
+        self.token = bot_token
+        self.editable = True
+        self.msg = 'Выберите статус заказа'
+    def activate(self):
+        self.links = {
+            'В обработке': AdminOrderView(self.ctx, self.token, status=u'В обработке'),
+            'Завершенные': AdminOrderView(self.ctx, self.token, status=u'Завершен')
+        }
+        super(OrderNavView, self).activate()
+
+
+class SelectBotOrdersView(NavigationView):
+    def activate(self):
+        bots = self.ctx._db.bots.find({'chat_id': self.ctx.chat_id})
+        self.links = {telebot.TeleBot(bot['token']).get_me().first_name: OrderNavView(self.ctx, bot['token']) for bot in bots}
+        super(SelectBotOrdersView, self).activate()
+
+
+
 class MarketBotConvo(object):
     def __init__(self, data, bot):
         self.ctx = Context(bot)
         self.ctx.chat_id = data['chat_id']
-        self.ctx.orders = list(self.ctx._db.orders.find({'chat_id': data['chat_id']}))
-
-        self.delivery_view = OrderCreatorView(self.ctx, [
-            TextDetail('delivery_type', ['Доставка до дома', 'Самовывоз'], name='тип доставки', ctx=self.ctx),
-            TextDetail('address', name='Ваш адрес', ctx=self.ctx),
-            TextDetail('phone', name='Ваш телефон', ctx=self.ctx),
-            TextDetail('delivery_time', name='желаемое время доставки', ctx=self.ctx)
-        ], final_message='Заказ сформирован!')
-
+        self.ctx.orders = list(self.ctx._db.orders.find({'chat_id': data['chat_id']}).sort('date', pymongo.DESCENDING))
+        self.delivery_view = OrderCreatorView(self.ctx, [], final_message='Заказ сформирован!')
         self.menu_cat_view = InlineNavigationView(self.ctx, msg="Выберите категорию:")
         categories = defaultdict(list)
         for item_data in data['items']:
@@ -646,10 +792,11 @@ class MarketBotConvo(object):
         # self.menu_view = MenuNode(data, self.ctx, links={"delivery": self.delivery_view})
         self.history_view = HistoryView(self.ctx)
         self.main_view = self.ctx.main_view = NavigationView(self.ctx, links={"Меню": self.menu_cat_view, "История": self.history_view}, msg="Главное меню")
-        self.history_view.links = {"Главное меню": self.main_view}
+        self.history_view.links = {"Главное меню": self.main_view, 'Еще 5': self.history_view}
         self.history_view.main_view = self.main_view
         self.delivery_view.next_view = self.main_view
         self.delivery_view.main_view = self.main_view
+        self.main_view.activate()
 
     def process_message(self, message):
         self.ctx.process_message(message)
@@ -671,14 +818,23 @@ class MainConvo(MarketBotConvo):
         self.ctx.bots = {bot_data['chat_id']: MarketBot(bot_data) for bot_data in self.ctx._db.bots.find({'chat_id': data['chat_id']})}
 
         self.add_view = BotCreatorView(self.ctx, [
-            TokenDetail('shop.token', name='API token. Для этого перейдите в @BotFather и нажмите /newbot для создания бота. Придумайте название бота (должно быть на русском языке) и ссылку на бот (на английском языке и заканчиваться на bot). Далее вы увидите API token, который нужно скопировать и отправить в чат @BotMarket.', ctx=self.ctx),
+            TokenDetail('shop.token', name='API token.', desc='Для этого перейдите в @BotFather и нажмите /newbot для создания бота. Придумайте название бота (должно быть на русском языке) и ссылку на бот (на английском языке и заканчиваться на bot). Далее вы увидите API token, который нужно скопировать и отправить в этот чат.', ctx=self.ctx),
             EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx),
-            FileDetail('shop.items', name='файл с описанием товаров <a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>')
+            FileDetail('shop.items', name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>')
         ], final_message='Магазин создан!')
         self.settings_view = BotSettingsView(self.ctx, msg='Настройки')
-        self.ctx.main_view = self.main_view = NavigationView(self.ctx, links={"Добавить магазин": self.add_view, "Настройки": self.settings_view}, msg="Главное меню")
+        self.ctx.main_view = self.main_view = NavigationView(
+            self.ctx,
+            links={
+                "Добавить магазин": self.add_view,
+                "Настройки": self.settings_view,
+                "Заказы": SelectBotOrdersView(self.ctx, msg='Выберите магазин')
+            },
+            msg="Главное меню"
+        )
         self.add_view.next_view = self.main_view
         self.add_view.main_view = self.main_view
+        self.main_view.activate()
 
     def process_file(self, doc):
         # try:
@@ -716,12 +872,12 @@ class MarketBot(object):
         self.email = data.get('email')
 
     def get_db(self):
-        self.db = self.db or MongoClient('localhost', 27017)
+        self.db = self.db or MongoClient('localhost', 27017, connect=False)
         return self.db['marketbot']
 
 
     def _init_bot(self, threaded=False):
-        self.bot = telebot.TeleBot(self.token, threaded=threaded)
+        self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
         self.bot.add_message_handler(self.goto_main, commands=['start'])
         self.bot.add_callback_query_handler(self.process_callback, func=lambda call: True)
         self.bot.add_message_handler(self.process_file, content_types=['document'])
