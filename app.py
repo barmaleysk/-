@@ -504,7 +504,6 @@ class OrderCreatorView(DetailsView):
         super(OrderCreatorView, self).__init__(ctx, details, next_view, main_view, final_message)
         if len(self.ctx.orders) > 0:
             last_order = self.ctx.orders[0]['delivery']
-            print last_order.get('тип доставки'.decode('utf-8'))
         else:
             last_order = {}
 
