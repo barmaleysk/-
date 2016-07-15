@@ -15,6 +15,8 @@ from multiprocessing import Process
 import os
 from sendgrid.helpers.mail import *
 from datetime import datetime
+import pandas as pd
+from pandas import ExcelFile
 
 
 sg = sendgrid.SendGridAPIClient(apikey=os.environ.get('SENDGRID_API_KEY'))
@@ -89,8 +91,8 @@ class Context(object):
                 pass
 
     def edit_message(self, message_id, msg, markup=None):
-        print self.chat_id, message_id
-        print self.bot.get_chat(self.chat_id)
+        # print self.chat_id, message_id
+        # print self.bot.get_chat(self.chat_id)
         if self.chat_id:
             try:
                 msg1 = msg.replace('<br />', '')
@@ -111,7 +113,7 @@ class Context(object):
             self.current_view.process_message(txt)
 
     def process_callback(self, callback):
-        print self, callback
+        # print self, callback
         if self.current_view:
             self.current_view.process_callback(callback)
 
@@ -144,19 +146,8 @@ class View(object):
             if msg and self.editable:
                 self.ctx.views[self] = msg.message_id
         else:
-            print 'edit'
+            # print 'edit'
             self.ctx.edit_message(self.ctx.views[self], self.get_msg(), self.get_markup())
-
-
-# class MenuItem(object):
-#     def __init__(self, data):
-#         self.name = data['name']
-#         self.description = data['desc']
-#         self.price = int(data['price'])
-#         self.img_id = data['img']
-#         self.active = bool(int(data['active']))
-#         self.cat = data['cat']
-#         self.subcat = data['subcat']
 
 
 class ItemNode(View):
@@ -215,7 +206,7 @@ class ItemNode(View):
             self.count += 1
             self.render()
         if action == 'basket':
-            print 'got to basket'
+            # print 'got to basket'
             self.ordered = True
             self.menu.goto_basket(call)
 
@@ -289,7 +280,7 @@ class BasketNode(View):
 
     def process_callback(self, call):
         action = call.data.split(':')[-1]
-        print action
+        # print action
         if action == '>':
             self.inc()
         elif action == '<':
@@ -369,7 +360,7 @@ class MenuNode(View):
             self.basket.process_callback(call)
         elif _type == 'link':
             ll = data.split(':')[1]
-            print ll
+            # print ll
             if ll in self.links:
                 self.links[ll].activate()
 
@@ -516,7 +507,7 @@ class DetailsView(View):
             self.render()
 
     def process_message(self, cmd):
-        print cmd
+        # print cmd
         if cmd == 'ОК':
             if self.current().is_filled():
                 self.next()
@@ -561,8 +552,8 @@ class OrderCreatorView(DetailsView):
             TextDetail('delivery_time', name='желаемое время доставки', ctx=self.ctx)
         ]
 
-        for d in self.details:
-            print d.value, d.is_filled()
+        # for d in self.details:
+        #     print d.value, d.is_filled()
 
     def activate(self):
         self.filled = False
@@ -570,7 +561,7 @@ class OrderCreatorView(DetailsView):
         super(DetailsView, self).activate()
 
     def finalize(self):
-        print str(self.ctx.current_basket)
+        # print str(self.ctx.current_basket)
         order = self.ctx.current_basket.to_dict()
         order['delivery'] = {}
         for d in self.details:
@@ -596,12 +587,18 @@ class BotCreatorView(DetailsView):
         dd = {}
         for d in self.details:
             dd[d._id] = d.value
-        bot_data = {'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id}
+        bot_data = {'admin': self.ctx.bot.get_chat(self.ctx.chat_id).username, 'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id, 'delivery_info': dd['shop.delivery_info'], 'contacts_info': dd['shop.contacts_info']}
         self.ctx._db.bots.save(bot_data)
         new_bot = MarketBot(bot_data)
         new_bot.start()
 
-class UpdateBotView(BotCreatorView):
+
+    def activate(self):
+        self.filled = False
+        self.ptr = 0
+        super(DetailsView, self).activate()
+
+class UpdateBotView(BotCreatorView): # TODO: remove
     def activate(self):
         self.filled = False
         self.ptr = 0
@@ -611,7 +608,7 @@ class UpdateBotView(BotCreatorView):
         dd = {}
         for d in self.details:
             dd[d._id] = d.value
-        bot_data = {'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id}
+        bot_data = {'admin': self.ctx.bot.get_chat(self.ctx.chat_id).username, 'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id, 'delivery_info': dd['shop.delivery_info'], 'contacts_info': dd['shop.contacts_info']}
         self.ctx._db.bots.update_one({'token': dd['shop.token']}, {"$set": bot_data})
 
 
@@ -631,7 +628,7 @@ class NavigationView(View):
         return markup
 
     def process_message(self, message):
-        print message
+        # print message
         if message in self.links:
             self.links[message].activate()
 
@@ -643,7 +640,10 @@ class BotSettingsView(NavigationView):
             self.links['@' + telebot.TeleBot(bot['token']).get_me().first_name] = UpdateBotView(self.ctx, [
                 TokenDetail('shop.token', name='API token', ctx=self.ctx, value=bot['token']),
                 EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
-                FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>')
+                FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>'),
+                TextDetail('shop.delivery_info', name='текст с условиями доставки', value=bot.get('delivery_info')),
+                TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info'))
+        
         ], final_message='Магазин сохранен!', main_view=self.ctx.main_view, next_view=self)
         self.links['Главное меню'] = self.ctx.main_view
         super(BotSettingsView, self).activate()
@@ -679,7 +679,7 @@ class HistoryView(NavigationView):
         self.cursor += 5
 
     def process_message(self, message):
-        print message
+        # print message
 
         if message == 'Еще 5':
             self.render_5()
@@ -701,6 +701,11 @@ class InlineNavigationView(View):
         self.editable = True
         self.msg = msg
 
+    def activate(self):
+        self.ctx.send_message('.\n', markup=mk_markup(['Главное меню']))
+        super(InlineNavigationView, self).activate()
+
+
     def get_msg(self):
         return self.msg
 
@@ -712,17 +717,18 @@ class InlineNavigationView(View):
 
 
     def process_message(self, message):
-        self.ctx.main_view.process_message(message)
+        if message == 'Главное меню':
+            self.ctx.main_view.activate()
 
     def process_callback(self, callback):
         cmd = callback.data.encode('utf-8')
-        print cmd, self.links.keys()
+        # print cmd, self.links.keys()
         if cmd in self.links:
             self.links[cmd].activate()
 
     def add_child(self, cmd, ch_view):
         self.links[cmd] = ch_view
-        print cmd, ch_view
+        # fprint cmd, ch_view
 
 
 class OrderView(View):
@@ -824,9 +830,39 @@ class MenuCatView(InlineNavigationView):
         for item_data in data:
             categories[item_data['cat']].append(item_data)
         for category, items in categories.items():
-            self.add_child(category.encode('utf-8'), MenuNode(category.encode('utf-8'), items, self.ctx, links={"delivery": self.ctx.delivery_view}, parent=self))
+            try:
+                self.add_child(category.encode('utf-8'), MenuNode(category.encode('utf-8'), items, self.ctx, links={"delivery": self.ctx.delivery_view}, parent=self))
+            except Exception, e:
+                print e
         super(MenuCatView, self).activate()
 
+
+class HelpView(NavigationView):
+    def activate(self):
+        self.links = {'Главное меню': self.ctx.main_view}
+        super(HelpView, self).activate()
+
+    def get_msg(self):
+        return "По всем вопросам обращайтесь к @NikolaII :)"
+
+
+class OrderInfoView(HelpView):
+
+    def get_msg(self):
+        delivery_info = self.ctx.get_bot_data().get('delivery_info')
+        if delivery_info:
+            return delivery_info
+        else:
+            'Об условиях доставки пишите: @' + self.ctx.get_bot_data().get('admin')
+
+class ContactsInfoView(HelpView):
+
+    def get_msg(self):
+        contacts_info = self.ctx.get_bot_data().get('contacts_info')
+        if contacts_info:
+            return contacts_info
+        else:
+            'Чтобы узнать подробности свяжитесь с @' + self.ctx.get_bot_data().get('admin')
 
 
 class MarketBotConvo(object):
@@ -845,7 +881,13 @@ class MarketBotConvo(object):
 
         # self.menu_view = MenuNode(data, self.ctx, links={"delivery": self.delivery_view})
         self.history_view = HistoryView(self.ctx)
-        self.main_view = self.ctx.main_view = NavigationView(self.ctx, links={"Меню": self.menu_cat_view, "История": self.history_view}, msg="Главное меню")
+        self.main_view = self.ctx.main_view = NavigationView(self.ctx, links={
+            "Меню": self.menu_cat_view,
+            "История": self.history_view, 
+            "Доставка": OrderInfoView(self.ctx, msg="Тут должны быть условия доставки"),
+            "Контакты": ContactsInfoView(self.ctx)
+        },
+        msg="Главное меню")
         self.history_view.links = {"Главное меню": self.main_view, 'Еще 5': self.history_view}
         self.history_view.main_view = self.main_view
         self.delivery_view.next_view = self.main_view
@@ -876,7 +918,9 @@ class MainConvo(MarketBotConvo):
         self.add_view = BotCreatorView(self.ctx, [
             TokenDetail('shop.token', name='API token.', desc='Для этого перейдите в @BotFather и нажмите /newbot для создания бота. Придумайте название бота (должно быть на русском языке) и ссылку на бот (на английском языке и заканчиваться на bot). Далее вы увидите API token, который нужно скопировать и отправить в этот чат.', ctx=self.ctx),
             EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx),
-            FileDetail('shop.items', name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>')
+            FileDetail('shop.items', name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>'),
+            TextDetail('shop.delivery_info', name='текст с условиями доставки'),
+            TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + self.ctx.bot.get_chat(self.ctx.chat_id).username)
         ], final_message='Магазин создан!')
         self.settings_view = BotSettingsView(self.ctx, msg='Настройки')
         self.ctx.main_view = self.main_view = NavigationView(
@@ -884,7 +928,8 @@ class MainConvo(MarketBotConvo):
             links={
                 "Добавить магазин": self.add_view,
                 "Настройки": self.settings_view,
-                "Заказы": SelectBotOrdersView(self.ctx, msg='Выберите магазин')
+                "Заказы": SelectBotOrdersView(self.ctx, msg='Выберите магазин'),
+                "Помощь": HelpView(self.ctx) 
             },
             msg="Главное меню"
         )
@@ -900,25 +945,57 @@ class MainConvo(MarketBotConvo):
         file_info = self.ctx.bot.get_file(fid)
         content = self.ctx.bot.download_file(file_info.file_path)
         io = StringIO(content)
-        data = get_data(io)
-        print data.values()[0][0]
-        data = data.values()[0][1:]
+        try:
+            df = pd.read_csv(io)
+        except:
+            excel_data = get_data(io)
+            _keys = excel_data.values()[0][0]
+            _values = excel_data.values()[0][1:]
+            _items = [dict(zip(_keys, rec)) for rec in _values]
+            df = pd.DataFrame(_items)
 
-        items = []
-        for item in data:
-            try:
-                items.append({
-                    'id': item[0],
-                    'active': item[1],
-                    'cat': item[2],
-                    'subcat': item[3],
-                    'name': item[5],
-                    'desc': item[6],
-                    'price': item[12],
-                    'img': item[15]
-                })
-            except:
-                pass
+        print df.axes
+
+        df_keys = {k.lower():k for k in df.to_dict().keys()}
+        data = pd.DataFrame()
+
+        mapping = {
+            'id': ['id', 'product_id'],
+            'active': ['active', 'visible', u'активно'],
+            'cat': ['category', u'раздел 1'],
+            'name': [u'наименование', 'name'],
+            'desc': [u'описание', 'description', 'description(html)'],
+            'price': ['price', u'цена'],
+            'img': ['img_url', u'изображение']
+        }
+
+        for k, values in mapping.items():
+            for col_name in values:
+                if col_name in df_keys:
+                    data[k] = df[df_keys[col_name]]
+
+
+        # print data.values()[0][0]
+        # data = data.values.to_list()
+
+        # items = []
+        # for item in data:
+        #     try:
+        #         items.append({
+        #             'id': item[0],
+        #             'active': item[1],
+        #             'cat': item[2],
+        #             'subcat': item[3],
+        #             'name': item[5],
+        #             'desc': item[6],
+        #             'price': item[12],
+        #             'img': item[15]
+        #         })
+        # #     except:
+        #         pass
+        data['active'] = data['active'].map(lambda x: '1' if x in [1, 'y'] else '0')
+        items = data.T.to_dict().values()
+        # print items
         if len(items) == 0:
             raise Exception("no items added")
 
@@ -964,7 +1041,7 @@ class MarketBot(object):
         convo.goto_main()
 
     def process_callback(self, callback):
-        print callback.message.chat.id
+        # print callback.message.chat.id
         convo = self.get_convo(callback.message.chat.id)
         convo.process_callback(callback)
 
@@ -974,7 +1051,7 @@ class MarketBot(object):
 
     def process_file(self, doc):
         chat_id = doc.chat.id
-        print chat_id
+        # print chat_id
         convo = self.get_convo(chat_id)
         convo.process_file(doc)
 
