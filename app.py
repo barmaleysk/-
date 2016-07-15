@@ -73,13 +73,30 @@ class Context(object):
         self.orders = []
         self.current_basket = None
 
+
+    def get_bot_data(self):
+        return self._db.bots.find_one({'token': self.token})
+
+
     def send_message(self, msg, markup=None):
         if self.chat_id:
-            return self.bot.send_message(self.chat_id, msg, reply_markup=markup, parse_mode='HTML')
+            msg1 = msg.replace('<br />', '')
+            try:
+                msg = self.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
+                self._db.convos.update_one({'bot_token': self.token, 'chat_id': self.chat_id}, {'$set': {'last_message_id': msg.message_id}})
+                return msg
+            except:
+                pass
 
     def edit_message(self, message_id, msg, markup=None):
+        print self.chat_id, message_id
+        print self.bot.get_chat(self.chat_id)
         if self.chat_id:
-            return self.bot.edit_message_text(msg, chat_id=self.chat_id, message_id=message_id, reply_markup=markup, parse_mode='HTML')
+            try:
+                msg1 = msg.replace('<br />', '')
+                return self.bot.edit_message_text(msg1, chat_id=self.chat_id, message_id=message_id, reply_markup=markup, parse_mode='HTML')
+            except:
+                pass
 
     def process_message(self, message):
         if self.current_view:
@@ -126,7 +143,6 @@ class View(object):
             msg = self.ctx.send_message(self.get_msg(), self.get_markup())
             if msg and self.editable:
                 self.ctx.views[self] = msg.message_id
-                print msg.message_id, self.ctx, self.ctx.views
         else:
             print 'edit'
             self.ctx.edit_message(self.ctx.views[self], self.get_msg(), self.get_markup())
@@ -299,11 +315,15 @@ class BasketNode(View):
 
 
 class MenuNode(View):
-    def __init__(self, menu_items, ctx, links):
+    def __init__(self, msg, menu_items, ctx, links, parent=None):
         self.ctx = ctx
+        self.msg = msg
         self.items = {}
         self.basket = self.ctx.current_basket or BasketNode(self)
         self.links = links
+        self.ptr = 0
+        self.editable = True
+        self.parent = parent
         cnt = 0
         for item in menu_items:
             _id = str(cnt)
@@ -311,11 +331,32 @@ class MenuNode(View):
             cnt += 1
 
     def render(self):
-        for item in self.items.values():
+        super(MenuNode, self).render()
+        self.render_5()
+
+
+    def render_5(self):
+        for item in self.items.values()[self.ptr:self.ptr+5]:
             item.render()
+        self.ptr += 5
 
     def process_message(self, message):
-        self.ctx.main_view.process_message(message)
+        txt = message
+        if txt == 'Показать еще 5':
+            self.render()
+        elif txt == 'Назад':
+            self.parent.activate()
+
+
+    def get_msg(self):
+        return self.msg
+
+    def get_markup(self):
+        if self.ptr + 6 < len(self.items):
+            return mk_markup(['Показать еще 5', 'Назад'])
+        else:
+            return mk_markup(['Назад'])
+
 
     def process_callback(self, call):  # route callback to item node
         data = call.data.encode('utf-8')
@@ -541,7 +582,7 @@ class OrderCreatorView(DetailsView):
         self.ctx._db.orders.insert_one(order)
         self.ctx.current_basket.__init__(self.ctx.current_basket.menu)
         self.ctx.orders = [order] + self.ctx.orders
-        send_order(self.ctx.email, order)
+        send_order(self.ctx.get_bot_data()['email'], order)
 
 
 class BotCreatorView(DetailsView):
@@ -578,7 +619,7 @@ class NavigationView(View):
     def __init__(self, ctx, links={}, msg=""):
         self.links = links
         self.ctx = ctx
-        self.editable = False
+        self.editable = True
         self.msg = msg
 
     def get_msg(self):
@@ -773,19 +814,33 @@ class SelectBotOrdersView(NavigationView):
         super(SelectBotOrdersView, self).activate()
 
 
+class MenuCatView(InlineNavigationView):
+    def __init__(self, ctx, msg=''):
+        super(MenuCatView, self).__init__(ctx, msg=msg)
+
+    def activate(self):
+        data = self.ctx.get_bot_data()['items']
+        categories = defaultdict(list)
+        for item_data in data:
+            categories[item_data['cat']].append(item_data)
+        for category, items in categories.items():
+            self.add_child(category.encode('utf-8'), MenuNode(category.encode('utf-8'), items, self.ctx, links={"delivery": self.ctx.delivery_view}, parent=self))
+        super(MenuCatView, self).activate()
+
+
 
 class MarketBotConvo(object):
     def __init__(self, data, bot):
         self.ctx = Context(bot)
         self.ctx.chat_id = data['chat_id']
         self.ctx.orders = list(self.ctx._db.orders.find({'chat_id': data['chat_id']}).sort('date', pymongo.DESCENDING))
-        self.delivery_view = OrderCreatorView(self.ctx, [], final_message='Заказ сформирован!')
-        self.menu_cat_view = InlineNavigationView(self.ctx, msg="Выберите категорию:")
-        categories = defaultdict(list)
-        for item_data in data['items']:
-            categories[item_data['cat']].append(item_data)
-        for category, items in categories.items():
-            self.menu_cat_view.add_child(category.encode('utf-8'), MenuNode(items, self.ctx, links={"delivery": self.delivery_view}))
+        self.ctx.delivery_view = self.delivery_view = OrderCreatorView(self.ctx, [], final_message='Заказ сформирован!')
+        self.menu_cat_view = MenuCatView(self.ctx, msg="Выберите категорию:")
+        # categories = defaultdict(list)
+        # for item_data in data['items']:
+        #     categories[item_data['cat']].append(item_data)
+        # for category, items in categories.items():
+        #     self.menu_cat_view.add_child(category.encode('utf-8'), MenuNode(items, self.ctx, links={"delivery": self.delivery_view}))
 
 
         # self.menu_view = MenuNode(data, self.ctx, links={"delivery": self.delivery_view})
@@ -795,6 +850,8 @@ class MarketBotConvo(object):
         self.history_view.main_view = self.main_view
         self.delivery_view.next_view = self.main_view
         self.delivery_view.main_view = self.main_view
+        if data.get('last_message_id'):
+            self.ctx.views[self.main_view] = data['last_message_id']
         self.main_view.activate()
 
     def process_message(self, message):
@@ -833,6 +890,8 @@ class MainConvo(MarketBotConvo):
         )
         self.add_view.next_view = self.main_view
         self.add_view.main_view = self.main_view
+        if data.get('last_message_id'):
+            self.ctx.views[self.main_view] = data['last_message_id']
         self.main_view.activate()
 
     def process_file(self, doc):
@@ -842,20 +901,26 @@ class MainConvo(MarketBotConvo):
         content = self.ctx.bot.download_file(file_info.file_path)
         io = StringIO(content)
         data = get_data(io)
+        print data.values()[0][0]
         data = data.values()[0][1:]
 
         items = []
         for item in data:
-            items.append({
-                'id': item[0],
-                'active': item[1],
-                'cat': item[2],
-                'subcat': item[3],
-                'name': item[5],
-                'desc': item[6],
-                'price': item[12],
-                'img': item[15]
-            })
+            try:
+                items.append({
+                    'id': item[0],
+                    'active': item[1],
+                    'cat': item[2],
+                    'subcat': item[3],
+                    'name': item[5],
+                    'desc': item[6],
+                    'price': item[12],
+                    'img': item[15]
+                })
+            except:
+                pass
+        if len(items) == 0:
+            raise Exception("no items added")
 
         self.ctx.tmpdata = items
 
@@ -882,13 +947,16 @@ class MarketBot(object):
         self.bot.add_message_handler(self.process_file, content_types=['document'])
         self.bot.add_message_handler(self.process_message, func=lambda message: True, content_types=['text', 'contact'])
 
+    def init_convo(self, convo_data):
+        convo_data = dict(self.data.items() + convo_data.items())
+        self.convos[convo_data['chat_id']] = self.convo_type(convo_data, self)
+
+
     def get_convo(self, chat_id):
-        print self.convos
         if chat_id not in self.convos:
             convo_data = {'chat_id': chat_id, 'bot_token': self.token}
-            convo_data = dict(self.data.items() + convo_data.items())
-            self.convos[chat_id] = self.convo_type(convo_data, self)
-        print 'chat_id', chat_id, self.convos[chat_id].ctx
+            self.get_db().convos.insert_one(convo_data)
+            self.init_convo(convo_data)
         return self.convos[chat_id]
 
     def goto_main(self, message):
@@ -912,6 +980,8 @@ class MarketBot(object):
 
     def start(self):
         self._init_bot()
+        for convo_data in self.get_db().convos.find({'bot_token': self.token}):
+            self.init_convo(convo_data)
         Process(target=self.bot.polling).start()
 
 
@@ -920,6 +990,8 @@ class MasterBot(MarketBot):
 
     def start(self):
         self._init_bot()
+        for convo_data in self.get_db().convos.find({'bot_token': self.token}):
+            self.init_convo(convo_data)
         for bot_data in self.get_db().bots.find():
             m = MarketBot(bot_data)
             m.start()
