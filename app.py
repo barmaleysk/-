@@ -317,9 +317,12 @@ class MenuNode(View):
         self.parent = parent
         cnt = 0
         for item in menu_items:
-            _id = str(cnt)
-            self.items[_id] = ItemNode(item, _id, self.ctx, self)
-            cnt += 1
+            try:
+                _id = str(cnt)
+                self.items[_id] = ItemNode(item, _id, self.ctx, self)
+                cnt += 1
+            except:
+                pass
 
     def render(self):
         super(MenuNode, self).render()
