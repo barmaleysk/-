@@ -17,6 +17,13 @@ from sendgrid.helpers.mail import *
 from datetime import datetime
 import pandas as pd
 from pandas import ExcelFile
+import re
+
+
+def striphtml(data):
+    p = re.compile(r'<.*?>')
+    res = p.sub('', data)
+    return res.replace('&nbsp;', ' ').replace('&mdash;', '-')
 
 
 sg = sendgrid.SendGridAPIClient(apikey=os.environ.get('SENDGRID_API_KEY'))
@@ -146,7 +153,6 @@ class View(object):
             if msg and self.editable:
                 self.ctx.views[self] = msg.message_id
         else:
-            # print 'edit'
             self.ctx.edit_message(self.ctx.views[self], self.get_msg(), self.get_markup())
 
 
@@ -198,7 +204,7 @@ class ItemNode(View):
         return self.count * self.price
 
     def get_msg(self):
-        return '<a href="' + self.img + '">' + self.name + '</a>\n' + self.description
+        return '<a href="' + self.img + '">' + self.name + '</a>\n' + striphtml(self.description)
 
     def process_callback(self, call):
         _id, action = call.data.split(':')[1:]
@@ -833,10 +839,11 @@ class MenuCatView(InlineNavigationView):
         for item_data in data:
             categories[item_data['cat']].append(item_data)
         for category, items in categories.items():
-            try:
+            if (isinstance(category, str) or isinstance(category, unicode)) and len(items) > 0:
+            # try:
                 self.add_child(category.encode('utf-8'), MenuNode(category.encode('utf-8'), items, self.ctx, links={"delivery": self.ctx.delivery_view}, parent=self))
-            except Exception, e:
-                print e
+            # except Exception, e:
+            #     print e
         super(MenuCatView, self).activate()
 
 
