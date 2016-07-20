@@ -90,10 +90,14 @@ class Context(object):
             msg1 = msg.replace('<br />', '.\n')
             try:
                 msg = self.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
+                self.log(msg1, data={'type': 'send_message', 'markup': markup.to_json()})
                 self._db.convos.update_one({'bot_token': self.token, 'chat_id': self.chat_id}, {'$set': {'last_message_id': msg.message_id}})
                 return msg
             except:
                 pass
+
+    def log(self, txt, data=None):
+        self._db.logs.insert_one({'bot_token': self.token, 'chat_id': self.chat_id, 'txt': txt, 'data': data})
 
     def edit_message(self, message_id, msg, markup=None):
         # print self.chat_id, message_id
@@ -101,6 +105,7 @@ class Context(object):
         if self.chat_id:
             try:
                 msg1 = msg.replace('<br />', '.\n')
+                self.log(msg1, data={'type': 'edit_message', 'markup': markup.to_json()})
                 return self.bot.edit_message_text(msg1, chat_id=self.chat_id, message_id=message_id, reply_markup=markup, parse_mode='HTML')
             except:
                 pass
@@ -115,11 +120,13 @@ class Context(object):
                 except:
                     pass
 
+            self.log(txt, data={'type': 'process_message'})
             self.current_view.process_message(txt)
 
     def process_callback(self, callback):
         # print self, callback
         if self.current_view:
+            self.log(txt, data={'type': 'process_callback', 'callback_data': callback.data})
             self.current_view.process_callback(callback)
 
 
