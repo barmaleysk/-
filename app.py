@@ -5,28 +5,26 @@ from telebot import types
 from pyexcel_xls import get_data
 from StringIO import StringIO
 from validate_email import validate_email
-import pickle
 from collections import defaultdict
 from pymongo import MongoClient
 import pymongo
-from threading import Thread
 import sendgrid
 from multiprocessing import Process
 import os
 from sendgrid.helpers.mail import *
 from datetime import datetime
 import pandas as pd
-from pandas import ExcelFile
 import re
 
 
 def striphtml(data):
-    p = re.compile(r'<.*?>')
-    res = p.sub('', data)
+    p = re.compile(r'<[brai].*?>|<\/[a].*?>|<span.*?>|<\/span.*?>')
+    res = p.sub('\n', data)
     return res.replace('&nbsp;', ' ').replace('&mdash;', '-')
 
 
 sg = sendgrid.SendGridAPIClient(apikey=os.environ.get('SENDGRID_API_KEY'))
+
 
 def send_order(mail, order):
     pass
@@ -34,15 +32,15 @@ def send_order(mail, order):
     subject = "Новый заказ!"
     to_email = Email(mail)
     res = 'Заказ\n====\n\n\n'
-    res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in order['items'] )
+    res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in order['items'])
     res += '\n-----\n Итого: ' + str(order['total']) + ' руб.'
     res += '\n-----\n Детали доставки: \n'
-    res += '\n\n'.join(k + ': ' + v for k,v in order['delivery'].items())
+    res += '\n\n'.join(k + ': ' + v for k, v in order['delivery'].items())
     res = res.replace('Ваш', '')
     content = Content("text/plain", res)
     mail = Mail(from_email, subject, to_email, content)
     response = sg.client.mail.send.post(request_body=mail.get())
-
+    return response
 
 
 def mk_inline_markup(command_list):
@@ -89,7 +87,7 @@ class Context(object):
 
     def send_message(self, msg, markup=None):
         if self.chat_id:
-            msg1 = msg.replace('<br />', '')
+            msg1 = msg.replace('<br />', '.\n')
             try:
                 msg = self.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
                 self._db.convos.update_one({'bot_token': self.token, 'chat_id': self.chat_id}, {'$set': {'last_message_id': msg.message_id}})
@@ -102,7 +100,7 @@ class Context(object):
         # print self.bot.get_chat(self.chat_id)
         if self.chat_id:
             try:
-                msg1 = msg.replace('<br />', '')
+                msg1 = msg.replace('<br />', '.\n')
                 return self.bot.edit_message_text(msg1, chat_id=self.chat_id, message_id=message_id, reply_markup=markup, parse_mode='HTML')
             except:
                 pass
@@ -239,7 +237,7 @@ class BasketNode(View):
         return filter(lambda i: i.ordered is True, self.menu.items.values())
 
     def activate(self):
-        self.items = list(set(self.items +  self.get_ordered_items()))
+        self.items = list(set(self.items + self.get_ordered_items()))
         self.item_ptr = 0
 
     def current_item(self):
@@ -300,8 +298,8 @@ class BasketNode(View):
         if self.get_total() > 0:
             markup = types.InlineKeyboardMarkup()
             markup.row(
-                btn('-', 'basket:-'), 
-                btn(str(self.current_item().count) + ' шт.', 'basket:cnt'), 
+                btn('-', 'basket:-'),
+                btn(str(self.current_item().count) + ' шт.', 'basket:cnt'),
                 btn('+', 'basket:+')
             )
             markup.row(btn('<', 'basket:<'), btn(str(self.item_ptr + 1) + '/' + str(len(self.items)), 'basket:ptr'), btn('>', 'basket:>'))
@@ -334,9 +332,8 @@ class MenuNode(View):
         super(MenuNode, self).render()
         self.render_5()
 
-
     def render_5(self):
-        for item in self.items.values()[self.ptr:self.ptr+5]:
+        for item in self.items.values()[self.ptr:self.ptr + 5]:
             item.render()
         self.ptr += 5
 
@@ -347,7 +344,6 @@ class MenuNode(View):
         elif txt == 'Назад':
             self.parent.activate()
 
-
     def get_msg(self):
         return self.msg
 
@@ -356,7 +352,6 @@ class MenuNode(View):
             return mk_markup(['Показать еще 5', 'Назад'])
         else:
             return mk_markup(['Назад'])
-
 
     def process_callback(self, call):  # route callback to item node
         data = call.data.encode('utf-8')
@@ -518,15 +513,15 @@ class DetailsView(View):
     def process_message(self, cmd):
         # print cmd
         if cmd == 'ОК':
-            if self.current().is_filled():
-                self.next()
-            elif isinstance(self.current(), FileDetail):
+            if isinstance(self.current(), FileDetail) and self.ctx.tmpdata is not None:
                 if self.current().validate(self.ctx.tmpdata):
                     self.current().value = self.ctx.tmpdata
                     self.ctx.tmpdata = None
                     self.next()
                 else:
                     self.ctx.send_message('Неверный формат файла')
+            elif self.current().is_filled():
+                self.next()
         elif cmd == 'назад':
             self.prev()
         elif cmd == 'главное меню':
@@ -841,6 +836,7 @@ class MenuCatView(InlineNavigationView):
         for category, items in categories.items():
             if (isinstance(category, str) or isinstance(category, unicode)) and len(items) > 0:
             # try:
+                # print items
                 self.add_child(category.encode('utf-8'), MenuNode(category.encode('utf-8'), items, self.ctx, links={"delivery": self.ctx.delivery_view}, parent=self))
             # except Exception, e:
             #     print e
@@ -960,11 +956,10 @@ class MainConvo(MarketBotConvo):
         except:
             excel_data = get_data(io)
             _keys = excel_data.values()[0][0]
+            # print _keys
             _values = excel_data.values()[0][1:]
             _items = [dict(zip(_keys, rec)) for rec in _values]
             df = pd.DataFrame(_items)
-
-        print df.axes
 
         df_keys = {k.lower():k for k in df.to_dict().keys()}
         data = pd.DataFrame()
@@ -972,11 +967,11 @@ class MainConvo(MarketBotConvo):
         mapping = {
             'id': ['id', 'product_id'],
             'active': ['active', 'visible', u'активно'],
-            'cat': ['category', u'раздел 1'],
+            'cat': ['category', u'раздел 1', u'категория'],
             'name': [u'наименование', 'name'],
             'desc': [u'описание', 'description', 'description(html)'],
             'price': ['price', u'цена'],
-            'img': ['img_url', u'изображение']
+            'img': ['img_url', u'изображение', u'ссылка на изображение']
         }
 
         for k, values in mapping.items():
@@ -1012,11 +1007,11 @@ class MainConvo(MarketBotConvo):
         self.ctx.tmpdata = items
 
 
-
 class MarketBot(object):
     convo_type = MarketBotConvo
+
     def __init__(self, data):
-        self.token = data['token']    
+        self.token = data['token']
         self.data = data
         self.convos = {}
         self.db = None
@@ -1025,7 +1020,6 @@ class MarketBot(object):
     def get_db(self):
         self.db = self.db or MongoClient('localhost', 27017, connect=False)
         return self.db['marketbot']
-
 
     def _init_bot(self, threaded=False):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
@@ -1037,7 +1031,6 @@ class MarketBot(object):
     def init_convo(self, convo_data):
         convo_data = dict(self.data.items() + convo_data.items())
         self.convos[convo_data['chat_id']] = self.convo_type(convo_data, self)
-
 
     def get_convo(self, chat_id):
         if chat_id not in self.convos:
@@ -1087,4 +1080,3 @@ class MasterBot(MarketBot):
 
 mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})
 mb.start()
-
