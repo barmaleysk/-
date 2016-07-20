@@ -126,7 +126,7 @@ class Context(object):
     def process_callback(self, callback):
         # print self, callback
         if self.current_view:
-            self.log(txt, data={'type': 'process_callback', 'callback_data': callback.data})
+            self.log(callback.data, data={'type': 'process_callback'})
             self.current_view.process_callback(callback)
 
 
