@@ -1065,11 +1065,14 @@ class MarketBot(object):
         convo = self.get_convo(chat_id)
         convo.process_file(doc)
 
-    def start(self):
-        self._init_bot()
+    def _start_bot(self):
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        Process(target=self.bot.polling).start()
+        self.bot.polling()
+
+    def start(self):
+        self._init_bot()
+        Process(target=_start_bot).start()
 
 
 class MasterBot(MarketBot):
