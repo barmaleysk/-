@@ -1073,7 +1073,7 @@ class MarketBot(object):
 
     def start(self):
         self._init_bot()
-        Thread(target=self._start_bot).start()
+        Process(target=self._start_bot).start()
 
 
 class MasterBot(MarketBot):
