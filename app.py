@@ -10,7 +10,7 @@ from pymongo import MongoClient
 import pymongo
 import sendgrid
 from multiprocessing import Process
-from Threading import Thread
+from threading import Thread
 import os
 from sendgrid.helpers.mail import *
 from datetime import datetime
@@ -1073,7 +1073,7 @@ class MarketBot(object):
 
     def start(self):
         self._init_bot()
-        Process(target=self._start_bot).start()
+        Thread(target=self._start_bot).start()
 
 
 class MasterBot(MarketBot):
