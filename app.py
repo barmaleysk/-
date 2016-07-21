@@ -1085,8 +1085,7 @@ class MasterBot(MarketBot):
         for bot_data in self.get_db().bots.find():
             m = MarketBot(bot_data)
             m.start()
-        self.bot.polling.start()
-        # Process(target=self.bot.polling).start()
+        Process(target=self.bot.polling).start()
 
 
 mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})
