@@ -10,6 +10,7 @@ from pymongo import MongoClient
 import pymongo
 import sendgrid
 from multiprocessing import Process
+from Threading import Thread
 import os
 from sendgrid.helpers.mail import *
 from datetime import datetime
@@ -1071,15 +1072,15 @@ class MarketBot(object):
         self.bot.polling()
 
     def start(self):
-        self._init_bot(threaded=True)
-        self._start_bot()#.start()
+        self._init_bot()
+        Thread(target=self._start_bot).start()
 
 
 class MasterBot(MarketBot):
     convo_type = MainConvo
 
     def start(self):
-        self._init_bot(threaded=True)
+        self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
         for bot_data in self.get_db().bots.find():
