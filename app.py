@@ -1028,7 +1028,7 @@ class MarketBot(object):
         self.db = self.db or MongoClient('localhost', 27017, connect=False)
         return self.db['marketbot']
 
-    def _init_bot(self, threaded=False):
+    def _init_bot(self, threaded=True):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
         self.bot.add_message_handler(self.goto_main, commands=['start'])
         self.bot.add_callback_query_handler(self.process_callback, func=lambda call: True)
