@@ -635,9 +635,10 @@ class NavigationView(View):
         return self.msg
 
     def get_markup(self):
-        markup = types.ReplyKeyboardMarkup()
-        markup.keyboard.append([{'text': key} for key in self.links.keys()])
-        return markup
+        return mk_markup(list(reversed(self.links.keys())))
+        # markup = types.ReplyKeyboardMarkup()
+        # markup.keyboard.append([{'text': key} for key in self.links.keys()])
+        # return markup
 
     def process_message(self, message):
         # print message
@@ -656,7 +657,7 @@ class BotSettingsView(NavigationView):
                 TextDetail('shop.delivery_info', name='текст с условиями доставки', value=bot.get('delivery_info')),
                 TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info'))
         
-        ], final_message='Магазин сохранен!', main_view=self.ctx.main_view, next_view=self)
+        ], final_message='Магазин сохранен!', main_view=self.ctx.main_view, next_view=self.ctx.main_view)
         self.links['Главное меню'] = self.ctx.main_view
         super(BotSettingsView, self).activate()
 
@@ -1088,6 +1089,6 @@ class MasterBot(MarketBot):
             m.start()
         Process(target=self.bot.polling).start()
 
-
-mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})
+# mb = MasterBot({'token': '254039391:AAFWr_Wr3Fq0qgmZQqm5sTbF1BFv0Vbucjk'})  # test
+mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
 mb.start()
