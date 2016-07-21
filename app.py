@@ -1079,13 +1079,14 @@ class MasterBot(MarketBot):
     convo_type = MainConvo
 
     def start(self):
-        self._init_bot()
+        self._init_bot(threaded=True)
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
         for bot_data in self.get_db().bots.find():
             m = MarketBot(bot_data)
             m.start()
-        Process(target=self.bot.polling).start()
+        self.bot.polling.start()
+        # Process(target=self.bot.polling).start()
 
 
 mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})
