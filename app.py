@@ -933,7 +933,7 @@ class MainConvo(MarketBotConvo):
             EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx),
             FileDetail('shop.items', name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>'),
             TextDetail('shop.delivery_info', name='текст с условиями доставки'),
-            TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + self.ctx.bot.get_chat(self.ctx.chat_id).username)
+            TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + (self.ctx.bot.get_chat(self.ctx.chat_id).username) or '')
         ], final_message='Магазин создан!')
         self.settings_view = BotSettingsView(self.ctx, msg='Настройки')
         self.ctx.main_view = self.main_view = NavigationView(
@@ -942,7 +942,7 @@ class MainConvo(MarketBotConvo):
                 "Добавить магазин": self.add_view,
                 "Настройки": self.settings_view,
                 "Заказы": SelectBotOrdersView(self.ctx, msg='Выберите магазин'),
-                "Помощь": HelpView(self.ctx) 
+                "Помощь": HelpView(self.ctx)
             },
             msg="Главное меню"
         )
