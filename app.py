@@ -68,12 +68,12 @@ def BTN(txt, request_contact=None):
 
 
 class Context(object):
-    def __init__(self, bot):
+    def __init__(self, bot, chat_id):
         self.bot = bot.bot
         self.token = bot.token
         self.email = bot.email
         self._db = bot.get_db()
-        self.chat_id = None
+        self.chat_id = chat_id
         self.views = {}
         self.current_view = None
         self.tmpdata = None
@@ -881,8 +881,7 @@ class ContactsInfoView(HelpView):
 
 class MarketBotConvo(object):
     def __init__(self, data, bot):
-        self.ctx = Context(bot)
-        self.ctx.chat_id = data['chat_id']
+        self.ctx = Context(bot, data['chat_id'])
         self.ctx.orders = list(self.ctx._db.orders.find({'token': self.ctx.token, 'chat_id': data['chat_id']}).sort('date', pymongo.DESCENDING))
         self.ctx.delivery_view = self.delivery_view = OrderCreatorView(self.ctx, [], final_message='Заказ сформирован!')
         self.menu_cat_view = MenuCatView(self.ctx, msg="Выберите категорию:")
@@ -925,8 +924,7 @@ class MarketBotConvo(object):
 
 class MainConvo(MarketBotConvo):
     def __init__(self, data, bot):
-        self.ctx = Context(bot)
-        self.ctx.chat_id = data['chat_id']
+        self.ctx = Context(bot, data['chat_id'])
         self.ctx.bots = {bot_data['chat_id']: MarketBot(bot_data) for bot_data in self.ctx._db.bots.find({'chat_id': data['chat_id']})}
 
         self.add_view = BotCreatorView(self.ctx, [
@@ -1054,10 +1052,12 @@ class MarketBot(object):
     def process_callback(self, callback):
         # print callback.message.chat.id
         convo = self.get_convo(callback.message.chat.id)
+        print self.token, callback.message.chat.id, convo
         convo.process_callback(callback)
 
     def process_message(self, message):
         convo = self.get_convo(message.chat.id)
+        print self.token, message.chat.id, convo
         convo.process_message(message)
 
     def process_file(self, doc):
@@ -1067,13 +1067,13 @@ class MarketBot(object):
         convo.process_file(doc)
 
     def _start_bot(self):
-        for convo_data in self.get_db().convos.find({'bot_token': self.token}):
-            self.init_convo(convo_data)
-        self.bot.polling()
+        self.bot.polling(interval=0.25)
 
     def start(self):
         self._init_bot()
-        Thread(target=self._start_bot).start()
+        for convo_data in self.get_db().convos.find({'bot_token': self.token}):
+            self.init_convo(convo_data)
+        Process(target=self.bot.polling).start()
 
 
 class MasterBot(MarketBot):
