@@ -882,7 +882,7 @@ class MarketBotConvo(object):
     def __init__(self, data, bot):
         self.ctx = Context(bot)
         self.ctx.chat_id = data['chat_id']
-        self.ctx.orders = list(self.ctx._db.orders.find({'chat_id': data['chat_id']}).sort('date', pymongo.DESCENDING))
+        self.ctx.orders = list(self.ctx._db.orders.find({'token': self.ctx.token, 'chat_id': data['chat_id']}).sort('date', pymongo.DESCENDING))
         self.ctx.delivery_view = self.delivery_view = OrderCreatorView(self.ctx, [], final_message='Заказ сформирован!')
         self.menu_cat_view = MenuCatView(self.ctx, msg="Выберите категорию:")
         # categories = defaultdict(list)
