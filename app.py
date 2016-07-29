@@ -16,6 +16,7 @@ from sendgrid.helpers.mail import *
 from datetime import datetime
 import pandas as pd
 import re
+from vk_crawler import Crawler
 
 
 def striphtml(data):
@@ -541,6 +542,16 @@ class DetailsView(View):
                     self.next()
                 else:
                     self.ctx.send_message('Неверный формат')
+            elif isinstance(self.current(), FileDetail):
+                if 'vk.com' in cmd:
+                    try:
+                        celf.ctx.tmpdata = Crawler(cmd).fetch()
+                        if self.current().validate(self.ctx.tmpdata):
+                            self.current().value = self.ctx.tmpdata
+                            self.ctx.tmpdata = None
+                            self.next()
+                    except:
+                        self.ctx.send_message('Неверный формат магазина')
 
 
 class OrderCreatorView(DetailsView):
