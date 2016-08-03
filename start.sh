@@ -1,2 +1,2 @@
 #!/bin/bash
-python app.py > log.txt & 
+python app.py > /home/ubuntu/marketbot.log & 
