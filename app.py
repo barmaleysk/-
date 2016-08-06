@@ -644,7 +644,8 @@ class MainConvo(Convo):
             self.route(['main_view'])
 
     def start_bot(self, bot_data):
-        MarketBot(bot_data).start()
+        mb = MarketBot(bot_data)
+        BotProcessor().register_bot(mb.bot)
 
     def process_file(self, doc):
         # try:
@@ -689,6 +690,36 @@ class MainConvo(Convo):
         self.tmpdata = items
 
 
+class Singleton(object):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Singleton, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
+
+class BotProcessor(Singleton):
+    queue = set()
+
+    def register_bot(self, bot):
+        self.queue.add(bot)
+
+    def step(self):
+        for bot in self.queue:
+            try:
+                # bot.__retrieve_updates(0)
+                updates = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
+                bot.process_new_updates(updates)
+            except Exception, e:
+                print e
+
+    def run(self):
+        print self.queue
+        while True:
+            self.step()
+
+
 class MarketBot(object):
     convo_type = MarketBotConvo
 
@@ -723,7 +754,7 @@ class MarketBot(object):
 
     def goto_main(self, message):
         convo = self.get_convo(message.chat.id)
-        convo.route('main_view')
+        convo.route(['main_view'])
 
     def process_callback(self, callback):
         # print callback.message.chat.id
@@ -740,14 +771,11 @@ class MarketBot(object):
         convo = self.get_convo(chat_id)
         convo.process_file(doc)
 
-    def _start_bot(self):
-        self.bot.polling(interval=0.25)
-
     def start(self):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        Process(target=self.bot.polling).start()
+        BotProcessor().register_bot(self.bot)
 
 
 class MasterBot(MarketBot):
@@ -760,7 +788,8 @@ class MasterBot(MarketBot):
         for bot_data in self.get_db().bots.find():
             m = MarketBot(bot_data)
             m.start()
-        Process(target=self.bot.polling).start()
+        BotProcessor().register_bot(self.bot)
+        BotProcessor().run()
 
 
 if __name__ == "__main__":
