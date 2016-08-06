@@ -1100,6 +1100,6 @@ class MasterBot(MarketBot):
             m.start()
         Process(target=self.bot.polling).start()
 
-mb = MasterBot({'token': '254039391:AAFWr_Wr3Fq0qgmZQqm5sTbF1BFv0Vbucjk'})  # test
-#mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
+#mb = MasterBot({'token': '254039391:AAFWr_Wr3Fq0qgmZQqm5sTbF1BFv0Vbucjk'})  # test
+mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
 mb.start()
