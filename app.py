@@ -466,7 +466,8 @@ class MenuCatView(InlineNavigationView):
         self.categories = defaultdict(list)
         for item_data in data:
             self.categories[item_data['cat']].append(item_data)
-        del self.categories[u'']
+        if u'' in self.categories:
+            del self.categories[u'']
         self.links = {cat: ['menu_cat_view', cat] for cat in self.categories.keys()}
         self.views = {cat: MenuNode(cat, items, self.ctx, links={"delivery": ['delivery']}) for cat, items in self.categories.items()}
 
