@@ -443,7 +443,11 @@ class SelectBotOrdersView(NavigationView):
         if path == []:
             return self
         token = path[0]
-        return OrderNavView(self.ctx, token).route(path[1:])
+        if not hasattr(self, 'views'):
+            self.views = {}
+        if token not in self.views:
+            self.views[token] = OrderNavView(self.ctx, token)
+        return self.views[token].route(path[1:])
 
     def activate(self):
         self.views = {}
