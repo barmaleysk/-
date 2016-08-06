@@ -150,12 +150,12 @@ class AdminOrderView(View):
         self.token = bot_token
         self.editable = True
         self.status = status
-
-    def render(self):
         self.orders = [OrderView(self.ctx, o) for o in self.ctx.db.orders.find({'token': self.token, 'status': self.status}).sort('date', pymongo.DESCENDING)]
         self._orders = {}
         for o in self.orders:
             self._orders[str(o.data['number'])] = o
+
+    def render(self):
         if len(self.orders) > 0:
             self.ctx.send_message('Заказы', markup=self.mk_markup(['Еще 5', 'Главное меню']))
         else:
