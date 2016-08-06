@@ -98,7 +98,6 @@ class InlineNavigationView(NavigationView):
 
     def process_callback(self, callback):
         cmd = callback.data
-        print 'callback', cmd
         self.process_message(cmd)
 
 
