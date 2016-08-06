@@ -46,77 +46,13 @@ def send_order(mail, order):
     return response
 
 
-
-class Context(object):
-    def __init__(self, bot, chat_id):
-        self.bot = bot.bot
-        self.token = bot.token
-        self.email = bot.email
-        self._db = bot.get_db()
-        self.chat_id = chat_id
-        self.views = {}
-        self.current_view = None
-        self.tmpdata = None
-        self.bots = {}
-        self.orders = []
-        self.current_basket = None
-
-
-    def get_bot_data(self):
-        return self._db.bots.find_one({'token': self.token})
-
-
-    def send_message(self, msg, markup=None):
-        if self.chat_id:
-            msg1 = msg.replace('<br />', '.\n')
-            try:
-                msg = self.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
-                self.log(msg1, data={'type': 'send_message', 'markup': markup.to_json()})
-                self._db.convos.update_one({'bot_token': self.token, 'chat_id': self.chat_id}, {'$set': {'last_message_id': msg.message_id}})
-                return msg
-            except:
-                pass
-
-    def log(self, txt, data=None):
-        self._db.logs.insert_one({'bot_token': self.token, 'chat_id': self.chat_id, 'txt': txt, 'data': data})
-
-    def edit_message(self, message_id, msg, markup=None):
-        # print self.chat_id, message_id
-        # print self.bot.get_chat(self.chat_id)
-        if self.chat_id:
-            try:
-                msg1 = msg.replace('<br />', '.\n')
-                self.log(msg1, data={'type': 'edit_message', 'markup': markup.to_json()})
-                return self.bot.edit_message_text(msg1, chat_id=self.chat_id, message_id=message_id, reply_markup=markup, parse_mode='HTML')
-            except:
-                pass
-
-    def process_message(self, message):
-        if self.current_view:
-            try:
-                txt = message.text.encode('utf-8')
-            except:
-                try:
-                    txt = message.contact.phone_number
-                except:
-                    pass
-
-            self.log(txt, data={'type': 'process_message'})
-            self.current_view.process_message(txt)
-
-    def process_callback(self, callback):
-        # print self, callback
-        if self.current_view:
-            self.log(callback.data, data={'type': 'process_callback'})
-            self.current_view.process_callback(callback)
-
-
 class ItemNode(View):
     def __init__(self, menu_item, _id, ctx, menu):
         self.editable = True
         self.description = menu_item['desc']
         self.img = menu_item['img']
         self.count = 0
+        self.message_id = None
         self.price = int(menu_item['price'])
         self.name = menu_item['name']
         self._id = _id
@@ -165,6 +101,7 @@ class ItemNode(View):
         _id, action = call.data.split(':')[1:]
         if action == 'add':
             self.count += 1
+            print 'add', self.count
             self.render()
         if action == 'basket':
             # print 'got to basket'
@@ -255,12 +192,12 @@ class BasketNode(View):
         if self.get_total() > 0:
             markup = types.InlineKeyboardMarkup()
             markup.row(
-                btn('-', 'basket:-'),
-                btn(str(self.current_item().count) + ' шт.', 'basket:cnt'),
-                btn('+', 'basket:+')
+                self.btn('-', 'basket:-'),
+                self.btn(str(self.current_item().count) + ' шт.', 'basket:cnt'),
+                self.btn('+', 'basket:+')
             )
-            markup.row(btn('<', 'basket:<'), btn(str(self.item_ptr + 1) + '/' + str(len(self.items)), 'basket:ptr'), btn('>', 'basket:>'))
-            markup.row(btn('Заказ на ' + str(self.get_total()) + ' р. Оформить?', 'link:delivery'))
+            markup.row(self.btn('<', 'basket:<'), self.btn(str(self.item_ptr + 1) + '/' + str(len(self.items)), 'basket:ptr'), self.btn('>', 'basket:>'))
+            markup.row(self.btn('Заказ на ' + str(self.get_total()) + ' р. Оформить?', 'link:delivery'))
             return markup
         else:
             return None
@@ -274,8 +211,9 @@ class MenuNode(View):
         self.basket = self.ctx.current_basket or BasketNode(self)
         self.links = links
         self.ptr = 0
-        self.editable = True
+        self.editable = False
         self.parent = parent
+        self.message_id = None
         cnt = 0
         for item in menu_items:
             try:
@@ -284,6 +222,10 @@ class MenuNode(View):
                 cnt += 1
             except:
                 pass
+
+    # def activate(self):
+    #     self.render()
+    #     super(MenuNode, self).activate()
 
     def render(self):
         super(MenuNode, self).render()
@@ -299,16 +241,16 @@ class MenuNode(View):
         if txt == 'Показать еще 5':
             self.render()
         elif txt == 'Назад':
-            self.parent.activate()
+            self.ctx.route(['menu_cat_view'])
 
     def get_msg(self):
         return self.msg
 
     def get_markup(self):
         if self.ptr + 6 < len(self.items):
-            return mk_markup(['Показать еще 5', 'Назад'])
+            return self.mk_markup(['Показать еще 5', 'Назад'])
         else:
-            return mk_markup(['Назад'])
+            return self.mk_markup(['Назад'])
 
     def process_callback(self, call):  # route callback to item node
         data = call.data.encode('utf-8')
@@ -323,20 +265,21 @@ class MenuNode(View):
             ll = data.split(':')[1]
             # print ll
             if ll in self.links:
-                self.links[ll].activate()
+                self.ctx.route(self.links[ll])
 
     def goto_basket(self, call):
         self.basket.menu = self
+        self.basket.message_id = None
         self.basket.activate()
         self.basket.render()
 
 
-
 class OrderCreatorView(DetailsView):
-    def __init__(self, ctx, details, next_view=None, main_view=None, final_message=""):
-        super(OrderCreatorView, self).__init__(ctx, details, next_view, main_view, final_message)
-        if len(self.ctx.orders) > 0:
-            last_order = self.ctx.orders[0]['delivery']
+    def __init__(self, ctx, details, final_message=""):
+        super(OrderCreatorView, self).__init__(ctx, details, final_message)
+        self.orders = list(self.ctx.db.orders.find({'token': self.ctx.bot.token, 'chat_id': self.ctx.chat_id}).sort('date', pymongo.DESCENDING))
+        if len(self.orders) > 0:
+            last_order = self.orders[0]['delivery']
         else:
             last_order = {}
 
@@ -348,8 +291,8 @@ class OrderCreatorView(DetailsView):
 
         self.details = [
             TextDetail('delivery_type', ['Доставка до дома', 'Самовывоз'], name='тип доставки', ctx=self.ctx, value=_get('тип доставки')),
-            TextDetail('address', name='Ваш адрес', ctx=self.ctx, value=_get('Ваш адрес') ),
-            TextDetail('phone', name='Ваш телефон', ctx=self.ctx, value=_get('Ваш телефон') ),
+            TextDetail('address', name='Ваш адрес', ctx=self.ctx, value=_get('Ваш адрес')),
+            TextDetail('phone', name='Ваш телефон', ctx=self.ctx, value=_get('Ваш телефон')),
             TextDetail('delivery_time', name='желаемое время доставки', ctx=self.ctx)
         ]
 
@@ -370,11 +313,10 @@ class OrderCreatorView(DetailsView):
         order['date'] = datetime.utcnow()
         order['status'] = 'В обработке'
         order['token'] = self.ctx.token
-        order['number'] = len(self.ctx.orders) 
-        self.ctx._db.orders.insert_one(order)
-        self.ctx.current_basket.__init__(self.ctx.current_basket.menu)
-        self.ctx.orders = [order] + self.ctx.orders
+        order['number'] = len(self.orders) 
+        self.ctx.db.orders.insert_one(order)
         send_order(self.ctx.get_bot_data()['email'], order)
+        self.ctx.current_basket = None
 
 
     def activate(self):
@@ -399,23 +341,28 @@ class UpdateBotView(BotCreatorView): # TODO: remove
 
 
 class BotSettingsView(NavigationView):
-    def route(self, path):
+    def route(self, path):  # TODO: remove this hack!
         if path == []:
             return self
         else:
             token = path[0]
-            bot = self.ctx.db.bots.find_one({'chat_id': self.ctx.chat_id, 'token': token})
+            if not hasattr(self, 'views'):
+                self.views = {}
+            if token not in self.views:
+                bot = self.ctx.db.bots.find_one({'chat_id': self.ctx.chat_id, 'token': token})
+                self.views[token] = UpdateBotView(self.ctx, [
+                    TokenDetail('shop.token', name='API token', ctx=self.ctx, value=bot['token']),
+                    EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
+                    FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>'),
+                    TextDetail('shop.delivery_info', name='текст с условиями доставки', value=bot.get('delivery_info')),
+                    TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info'))
+                ], final_message='Магазин сохранен!')
 
-            return UpdateBotView(self.ctx, [
-                TokenDetail('shop.token', name='API token', ctx=self.ctx, value=bot['token']),
-                EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
-                FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>'),
-                TextDetail('shop.delivery_info', name='текст с условиями доставки', value=bot.get('delivery_info')),
-                TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info'))
-            ], final_message='Магазин сохранен!')
+            return self.views[token]
 
     def activate(self):
         self.links = {}
+        self.views = {}
         for bot in self.ctx.db.bots.find({'chat_id': self.ctx.chat_id}):
             name = '@' + telebot.TeleBot(bot['token']).get_me().first_name
             self.links[name] = ['settings_view', bot['token']]
@@ -445,10 +392,16 @@ class HistoryItem(object):
 class HistoryView(NavigationView):
     def activate(self):
         self.cursor = 0
+        self.orders = list(self.ctx.db.orders.find({'token': self.ctx.bot.token, 'chat_id': self.ctx.chat_id}).sort('date', pymongo.DESCENDING))
+        self.links = {
+            'Главное меню': ['main_view']
+        }
+        if len(self.orders) > 0:
+            self.links['Еще 5'] = ['history']
         super(HistoryView, self).activate()
 
     def render_5(self):
-        for order in self.ctx.orders[self.cursor:self.cursor + 5]:
+        for order in self.orders[self.cursor:self.cursor + 5]:
             self.ctx.send_message(str(HistoryItem(order)))
         self.cursor += 5
 
@@ -457,83 +410,15 @@ class HistoryView(NavigationView):
 
         if message == 'Еще 5':
             self.render_5()
-        elif message in self.links:
-            self.links[message].activate()
+        if message == 'Главное меню':
+            self.ctx.route(['main_view'])
 
     def get_msg(self):
-        if len(self.ctx.orders) > 0:
+        if len(self.orders) > 0:
             self.render_5()
             return ':)'
         else:
             return 'История заказов пуста'
-
-
-class OrderView(View):
-    def __init__(self, ctx, data):
-        self.ctx = ctx
-        self.data = data
-        self.editable = True
-
-    def get_msg(self):
-        res = 'Заказ #' + str(self.data['number']) + '\n'
-        res += 'Статус: ' + self.data['status'].encode('utf-8') + '\n'
-        res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in self.data['items'])
-        res += '\n-----\n Итого: ' + str(self.data['total']) + ' руб.'
-        res += '\n-----\n Детали доставки: \n'
-        res += '\n\n'.join(k.encode('utf-8') + ': ' + v.encode('utf-8') for k, v in self.data['delivery'].items())
-        res = res.replace('Ваш', '')
-        return res
-
-    def get_markup(self):
-        markup = types.InlineKeyboardMarkup(row_width=2)
-        if self.data['status'] == u'В обработке':
-            markup.row(self.btn(u'Завершить', str(self.data['number']) + ':complete'))
-        else:
-            markup.row(self.btn(u'Перенести в обработку', str(self.data['number']) + ':reactivate'))
-        return markup
-
-    def process_callback(self, action):
-        if action == 'complete':
-            self.ctx._db.orders.update_one({'_id': self.data['_id']}, {'$set': {'status': 'Завершен'}})
-            self.data = self.ctx._db.orders.find_one({'_id': self.data['_id']})
-            self.render()
-        elif action == 'reactivate':
-            self.ctx._db.orders.update_one({'_id': self.data['_id']}, {'$set': {'status': 'В обработке'}})
-            self.data = self.ctx._db.orders.find_one({'_id': self.data['_id']})
-            self.render()
-
-
-class AdminOrderView(View):
-    def __init__(self, ctx, bot_token, status=u'В обработке'):
-        self.ctx = ctx
-        self.token = bot_token
-        self.editable = True
-        self.status = status
-
-    def render(self):
-        self.orders = [OrderView(self.ctx, o) for o in self.ctx._db.orders.find({'token': self.token, 'status': self.status}).sort('date', pymongo.DESCENDING)]
-        self._orders = {}
-        for o in self.orders:
-            self._orders[str(o.data['number'])] = o
-        self.ctx.send_message('Заказы', markup=self.mk_markup(['Еще 5', 'Главное меню']))
-        self.ptr = 0
-        self.render_5()
-
-    def render_5(self):
-        for order in self.orders[self.ptr: self.ptr + 5]:
-            order.render()
-        self.ptr += 5
-
-    def process_message(self, message):
-        if message == 'Главное меню':
-            self.ctx.main_view.activate()
-        elif message == 'Еще 5':
-            self.render_5()
-
-    def process_callback(self, callback):
-        data = callback.data.encode('utf-8')
-        number, action = data.split(':')
-        self._orders[number].process_callback(action)
 
 
 class OrderNavView(NavigationView):
@@ -542,45 +427,59 @@ class OrderNavView(NavigationView):
         self.token = bot_token
         self.editable = True
         self.msg = 'Выберите статус заказа'
-        self.links = {}
-
-    def activate(self):
         self.links = {
-            'В обработке': AdminOrderView(self.ctx, self.token, status=u'В обработке'),
-            'Завершенные': AdminOrderView(self.ctx, self.token, status=u'Завершен')
+            'В обработке': ['select_bot_orders_view', self.token, 'in_processing'],
+            'Завершенные': ['select_bot_orders_view', self.token, 'done']
         }
-        super(OrderNavView, self).activate()
+        self.message_id = None
+
+    def route(self, path):
+        if path == []:
+            return self
+        if path == ['in_processing']:
+            return AdminOrderView(self.ctx, self.token, status=u'В обработке')
+        if path == ['done']:
+            return AdminOrderView(self.ctx, self.token, status=u'Завершен')
 
 
 class SelectBotOrdersView(NavigationView):
-    def get_view(self, path):
-        return OrderNavView(self.ctx, path)
+    def route(self, path):   # TODO !
+        if path == []:
+            return self
+        token = path[0]
+        return OrderNavView(self.ctx, token).route(path[1:])
 
     def activate(self):
         self.views = {}
         bots = self.ctx.db.bots.find({'chat_id': self.ctx.chat_id})
-        self.links = {telebot.TeleBot(bot['token']).get_me().first_name: 'select_bot_orders_view/' + bot['token'] for bot in bots}
+        self.links = {telebot.TeleBot(bot['token']).get_me().first_name: ['select_bot_orders_view', bot['token']] for bot in bots}
         super(SelectBotOrdersView, self).activate()
 
 
 class MenuCatView(InlineNavigationView):
     def __init__(self, ctx, msg=''):
         super(MenuCatView, self).__init__(ctx, msg=msg)
-
-    def activate(self):
         data = self.ctx.get_bot_data()['items']
-        categories = defaultdict(list)
+        self.categories = defaultdict(list)
         for item_data in data:
-            categories[item_data['cat']].append(item_data)
-        for category, items in categories.items():
-            if (isinstance(category, str) or isinstance(category, unicode)) and len(items) > 0:
-                try:
-                    print items
-                    self.add_child(category.encode('utf-8'), MenuNode(category.encode('utf-8'), items, self.ctx, links={"delivery": self.ctx.delivery_view}, parent=self))
-                except Exception, e:
-                    print e
-        super(MenuCatView, self).activate()
+            self.categories[item_data['cat']].append(item_data)
+        self.links = {cat: ['menu_cat_view', cat] for cat in self.categories.keys()}
+        self.views = {cat: MenuNode(cat, items, self.ctx, links={"delivery": ['delivery']}) for cat, items in self.categories.items()}
 
+    def process_message(self, cmd):
+        if cmd == 'Назад' or cmd == 'Главное меню':
+            self.ctx.route(['main_view'])
+        else:
+            super(MenuCatView, self).process_message(cmd)
+
+    def route(self, path):
+        if path == []:
+            self.views = {cat: MenuNode(cat, items, self.ctx, links={"delivery": ['delivery']}) for cat, items in self.categories.items()}
+        return super(MenuCatView, self).route(path)
+
+    def render(self):
+        self.ctx.send_message('Меню', markup=self.mk_markup(['Назад']))
+        super(MenuCatView, self).render()
 
 
 class OrderInfoView(HelpView):
@@ -591,6 +490,7 @@ class OrderInfoView(HelpView):
             return delivery_info
         else:
             'Об условиях доставки пишите: @' + self.ctx.get_bot_data().get('admin')
+
 
 class ContactsInfoView(HelpView):
 
@@ -605,6 +505,7 @@ class ContactsInfoView(HelpView):
 class Convo(object):
     def __init__(self, data, bot):
         self.bot = bot
+        self.token = bot.token
         self.db = bot.get_db()
         self.chat_id = data['chat_id']
         self.views = {}
@@ -678,45 +579,35 @@ class Convo(object):
 
 class MarketBotConvo(Convo):
     def __init__(self, data, bot):
-        self.ctx = Context(bot, data['chat_id'])
-        self.ctx.orders = list(self.ctx._db.orders.find({'token': self.ctx.token, 'chat_id': data['chat_id']}).sort('date', pymongo.DESCENDING))
-        self.ctx.delivery_view = self.delivery_view = OrderCreatorView(self.ctx, [], final_message='Заказ сформирован!')
-        self.menu_cat_view = MenuCatView(self.ctx, msg="Выберите категорию:")
+        super(MarketBotConvo, self).__init__(data, bot)
+        self.current_basket = None
+        self.views['delivery'] = OrderCreatorView(self, [], final_message='Заказ сформирован!')
+        self.views['menu_cat_view'] = MenuCatView(self, msg="Выберите категорию:")
+        self.views['order_info'] = OrderInfoView(self, msg="Тут должны быть условия доставки", links={'Главное меню': ['main_view']})
+        self.views['contacts'] = ContactsInfoView(self, links={'Главное меню': ['main_view']})
         # categories = defaultdict(list)
         # for item_data in data['items']:
         #     categories[item_data['cat']].append(item_data)
         # for category, items in categories.items():
         #     self.menu_cat_view.add_child(category.encode('utf-8'), MenuNode(items, self.ctx, links={"delivery": self.delivery_view}))
 
-
         # self.menu_view = MenuNode(data, self.ctx, links={"delivery": self.delivery_view})
-        self.history_view = HistoryView(self.ctx)
-        self.main_view = self.ctx.main_view = NavigationView(self.ctx, links={
-            "Меню": self.menu_cat_view,
-            "История": self.history_view, 
-            "Доставка": OrderInfoView(self.ctx, msg="Тут должны быть условия доставки"),
-            "Контакты": ContactsInfoView(self.ctx)
-        },
-        msg="Главное меню")
-        self.history_view.links = {"Главное меню": self.main_view, 'Еще 5': self.history_view}
-        self.history_view.main_view = self.main_view
-        self.delivery_view.next_view = self.main_view
-        self.delivery_view.main_view = self.main_view
-        if data.get('last_message_id'):
-            self.ctx.views[self.main_view] = data['last_message_id']
-        self.main_view.activate()
-
-    def process_message(self, message):
-        self.ctx.process_message(message)
-
-    def process_callback(self, callback):
-        self.ctx.process_callback(callback)
-
-    def goto_main(self):
-        self.main_view.activate()
-
-    def process_file(self, doc):
-        pass
+        self.views['history'] = HistoryView(self)
+        self.views['main_view'] = NavigationView(self, links={
+            "Меню": ['menu_cat_view'],
+            "История": ['history'],
+            "Доставка": ['order_info'],   # ,
+            "Контакты": ['contacts']   # ContactsInfoView(self.ctx)
+        }, msg="Главное меню")
+        # self.history_view.links = {"Главное меню": self.main_view, 'Еще 5': self.history_view}
+        # self.history_view.main_view = self.main_view
+        # self.delivery_view.next_view = self.main_view
+        # self.delivery_view.main_view = self.main_view
+        # if data.get('last_message_id'):
+        #     self.ctx.views[self.main_view] = data['last_message_id']
+        self.path = data.get('path')
+        if not self.get_current_view():
+            self.route(['main_view'])
 
 
 class MainConvo(Convo):
@@ -866,9 +757,9 @@ class MasterBot(MarketBot):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        # for bot_data in self.get_db().bots.find():
-        #     m = MarketBot(bot_data)
-        #     m.start()
+        for bot_data in self.get_db().bots.find():
+            m = MarketBot(bot_data)
+            m.start()
         Process(target=self.bot.polling).start()
 
 

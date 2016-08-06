@@ -3,6 +3,7 @@
 from telebot import types
 import telebot
 from validate_email import validate_email
+import pymongo
 
 
 class MarkupMixin(object):
@@ -47,6 +48,7 @@ class View(MarkupMixin):
         pass
 
     def activate(self):
+        self.deactivate()
         for v in self.ctx.views.values():
             v.deactivate()
         self.active = True
@@ -81,8 +83,9 @@ class NavigationView(View):
         return self.mk_markup(list(reversed(self.links.keys())))
 
     def process_message(self, message):
-        print self.links
+        print message, self.links
         if message in self.links:
+            print 'route to ', self.links[message]
             self.ctx.route(self.links[message])
 
 
@@ -94,7 +97,8 @@ class InlineNavigationView(NavigationView):
         return markup
 
     def process_callback(self, callback):
-        cmd = callback.data.encode('utf-8')
+        cmd = callback.data
+        print 'callback', cmd
         self.process_message(cmd)
 
 
@@ -102,6 +106,77 @@ class HelpView(NavigationView):
 
     def get_msg(self):
         return "По всем вопросам обращайтесь к @NikolaII :)"
+
+
+class OrderView(View):
+    def __init__(self, ctx, data):
+        self.ctx = ctx
+        self.data = data
+        self.editable = True
+
+    def get_msg(self):
+        res = 'Заказ #' + str(self.data['number']) + '\n'
+        res += 'Статус: ' + self.data['status'].encode('utf-8') + '\n'
+        res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in self.data['items'])
+        res += '\n-----\n Итого: ' + str(self.data['total']) + ' руб.'
+        res += '\n-----\n Детали доставки: \n'
+        res += '\n\n'.join(k.encode('utf-8') + ': ' + v.encode('utf-8') for k, v in self.data['delivery'].items())
+        res = res.replace('Ваш', '')
+        return res
+
+    def get_markup(self):
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        if self.data['status'] == u'В обработке':
+            markup.row(self.btn(u'Завершить', str(self.data['number']) + ':complete'))
+        else:
+            markup.row(self.btn(u'Перенести в обработку', str(self.data['number']) + ':reactivate'))
+        return markup
+
+    def process_callback(self, action):
+        if action == 'complete':
+            self.ctx.db.orders.update_one({'_id': self.data['_id']}, {'$set': {'status': 'Завершен'}})
+            self.data = self.ctx.db.orders.find_one({'_id': self.data['_id']})
+            self.render()
+        elif action == 'reactivate':
+            self.ctx._db.orders.update_one({'_id': self.data['_id']}, {'$set': {'status': 'В обработке'}})
+            self.data = self.ctx.db.orders.find_one({'_id': self.data['_id']})
+            self.render()
+
+
+class AdminOrderView(View):
+    def __init__(self, ctx, bot_token, status=u'В обработке'):
+        self.ctx = ctx
+        self.token = bot_token
+        self.editable = True
+        self.status = status
+
+    def render(self):
+        self.orders = [OrderView(self.ctx, o) for o in self.ctx.db.orders.find({'token': self.token, 'status': self.status}).sort('date', pymongo.DESCENDING)]
+        self._orders = {}
+        for o in self.orders:
+            self._orders[str(o.data['number'])] = o
+        if len(self.orders) > 0:
+            self.ctx.send_message('Заказы', markup=self.mk_markup(['Еще 5', 'Главное меню']))
+        else:
+            self.ctx.send_message('Нет заказов', markup=self.mk_markup(['Главное меню']))
+        self.ptr = 0
+        self.render_5()
+
+    def render_5(self):
+        for order in self.orders[self.ptr: self.ptr + 5]:
+            order.render()
+        self.ptr += 5
+
+    def process_message(self, message):
+        if message == 'Главное меню':
+            self.ctx.route(['main_view'])
+        elif message == 'Еще 5':
+            self.render_5()
+
+    def process_callback(self, callback):
+        data = callback.data.encode('utf-8')
+        number, action = data.split(':')
+        self._orders[number].process_callback(action)
 
 
 class Detail(object):
@@ -228,7 +303,7 @@ class DetailsView(View):
             self.filled = True
             self.prefinalize()
             self.render()
-            self.ctx.route('main_view')
+            self.ctx.route(['main_view'])
             self.finalize()
 
     def prev(self):
@@ -254,7 +329,7 @@ class DetailsView(View):
         elif cmd == 'назад':
             self.prev()
         elif cmd == 'главное меню':
-            self.ctx.route('main_view')
+            self.ctx.route(['main_view'])
         else:
             if isinstance(self.current(), TextDetail):
                 if self.current().validate(cmd):
