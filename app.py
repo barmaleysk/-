@@ -574,11 +574,11 @@ class MenuCatView(InlineNavigationView):
             categories[item_data['cat']].append(item_data)
         for category, items in categories.items():
             if (isinstance(category, str) or isinstance(category, unicode)) and len(items) > 0:
-            # try:
-                # print items
-                self.add_child(category.encode('utf-8'), MenuNode(category.encode('utf-8'), items, self.ctx, links={"delivery": self.ctx.delivery_view}, parent=self))
-            # except Exception, e:
-            #     print e
+                try:
+                    print items
+                    self.add_child(category.encode('utf-8'), MenuNode(category.encode('utf-8'), items, self.ctx, links={"delivery": self.ctx.delivery_view}, parent=self))
+                except Exception, e:
+                    print e
         super(MenuCatView, self).activate()
 
 
@@ -871,6 +871,7 @@ class MasterBot(MarketBot):
         #     m.start()
         Process(target=self.bot.polling).start()
 
-mb = MasterBot({'token': '254039391:AAFWr_Wr3Fq0qgmZQqm5sTbF1BFv0Vbucjk'})  # test
-# mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
-mb.start()
+
+if __name__ == "__main__":
+    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
+    mb.start()

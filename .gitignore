@@ -6,3 +6,4 @@ main.py
 *.pem
 *.env
 *.log
+token.dev
