@@ -432,14 +432,10 @@ class OrderNavView(NavigationView):
             'Завершенные': ['select_bot_orders_view', self.token, 'done']
         }
         self.message_id = None
-
-    def route(self, path):
-        if path == []:
-            return self
-        if path == ['in_processing']:
-            return AdminOrderView(self.ctx, self.token, status=u'В обработке')
-        if path == ['done']:
-            return AdminOrderView(self.ctx, self.token, status=u'Завершен')
+        self.views = {
+            'in_processing': AdminOrderView(self.ctx, self.token, status=u'В обработке'),
+            'done': AdminOrderView(self.ctx, self.token, status=u'Завершен')
+        }
 
 
 class SelectBotOrdersView(NavigationView):
