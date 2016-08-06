@@ -33,7 +33,12 @@ class View(MarkupMixin):
         self.active = False
         self.message_id = None
         self.msg = msg
-        self.links = {}
+
+    def route(self, path):
+        if path == []:
+            return self
+        elif hasattr(self, 'views') and path[0] in self.views:
+            return self.views[path[0]].route(path[1:])
 
     def process_message(self, message):
         pass
@@ -76,6 +81,7 @@ class NavigationView(View):
         return self.mk_markup(list(reversed(self.links.keys())))
 
     def process_message(self, message):
+        print self.links
         if message in self.links:
             self.ctx.route(self.links[message])
 

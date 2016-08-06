@@ -399,24 +399,27 @@ class UpdateBotView(BotCreatorView): # TODO: remove
 
 
 class BotSettingsView(NavigationView):
-    def get_view(self, path):
-        token = path
-        bot = self.ctx.db.bots.find_one({'chat_id': self.ctx.chat_id, 'token': token})
+    def route(self, path):
+        if path == []:
+            return self
+        else:
+            token = path[0]
+            bot = self.ctx.db.bots.find_one({'chat_id': self.ctx.chat_id, 'token': token})
 
-        return UpdateBotView(self.ctx, [
-            TokenDetail('shop.token', name='API token', ctx=self.ctx, value=bot['token']),
-            EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
-            FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>'),
-            TextDetail('shop.delivery_info', name='текст с условиями доставки', value=bot.get('delivery_info')),
-            TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info'))
-        ], final_message='Магазин сохранен!')
+            return UpdateBotView(self.ctx, [
+                TokenDetail('shop.token', name='API token', ctx=self.ctx, value=bot['token']),
+                EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
+                FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>'),
+                TextDetail('shop.delivery_info', name='текст с условиями доставки', value=bot.get('delivery_info')),
+                TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info'))
+            ], final_message='Магазин сохранен!')
 
     def activate(self):
         self.links = {}
         for bot in self.ctx.db.bots.find({'chat_id': self.ctx.chat_id}):
             name = '@' + telebot.TeleBot(bot['token']).get_me().first_name
-            self.links[name] = 'settings_view/' + bot['token']
-        self.links['Главное меню'] = 'main_view'
+            self.links[name] = ['settings_view', bot['token']]
+        self.links['Главное меню'] = ['main_view']
         super(BotSettingsView, self).activate()
 
 
@@ -605,17 +608,12 @@ class Convo(object):
         self.db = bot.get_db()
         self.chat_id = data['chat_id']
         self.views = {}
-        self.current_view = data.get('current_view')
+        self.path = data.get('path')
         self.tmpdata = None
 
     def get_current_view(self):
-        if self.current_view in self.views:
-            return self.views[self.current_view]
-        elif self.current_view and '/' in self.current_view:
-            view, rest = self.current_view.split('/')
-            if view in self.views:
-                self.views[self.current_view] = self.views[view].get_view(rest)
-                return self.views[self.current_view]
+        if self.path and self.path[0] in self.views:
+            return self.views[self.path[0]].route(self.path[1:])
         return None
 
     def get_bot_data(self):
@@ -647,6 +645,7 @@ class Convo(object):
                 pass
 
     def process_message(self, message):
+        print self.get_current_view()
         try:
             txt = message.text.encode('utf-8')
         except:
@@ -666,13 +665,13 @@ class Convo(object):
     def process_file(self, doc):
         pass
 
-    def set_view(self, path):
-        self.current_view = path
-        self.db.convos.update_one({'bot_token': self.bot.token, 'chat_id': self.chat_id}, {'$set': {'current_view': path}})
+    def set_path(self, path):
+        self.path = path
+        self.db.convos.update_one({'bot_token': self.bot.token, 'chat_id': self.chat_id}, {'$set': {'path': path}})
 
     def route(self, path):
         print path
-        self.set_view(path)
+        self.set_path(path)
         print self.get_current_view()
         self.get_current_view().activate()
 
@@ -726,14 +725,14 @@ class MainConvo(Convo):
         self.views['main_view'] = NavigationView(
             self,
             links={
-                "Добавить магазин": 'add_view',
-                "Настройки": 'settings_view',
-                "Заказы": 'select_bot_orders_view',
-                "Помощь": 'help_view'
+                "Добавить магазин": ['add_view'],
+                "Настройки": ['settings_view'],
+                "Заказы": ['select_bot_orders_view'],
+                "Помощь": ['help_view']
             },
             msg="Главное меню"
         )
-        self.views['help_view'] = HelpView(self, links={'Главное меню': 'main_view'})
+        self.views['help_view'] = HelpView(self, links={'Главное меню': ['main_view']})
         self.views['add_view'] = BotCreatorView(self, [
             TokenDetail('shop.token', name='API token.', desc='Для этого перейдите в @BotFather и нажмите /newbot для создания бота. Придумайте название бота (должно быть на русском языке) и ссылку на бот (на английском языке и заканчиваться на bot). Далее вы увидите API token, который нужно скопировать и отправить в этот чат.', ctx=self),
             EmailDetail('shop.email', name='email для приема заказов', ctx=self),
@@ -741,17 +740,16 @@ class MainConvo(Convo):
             TextDetail('shop.delivery_info', name='текст с условиями доставки'),
             TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + str(self.bot.bot.get_chat(self.chat_id).username))
         ], final_message='Магазин создан!')
-        self.views['settings_view'] = BotSettingsView(self, msg='Настройки', links={'Главное меню': 'main_view'})
+        self.views['settings_view'] = BotSettingsView(self, msg='Настройки', links={'Главное меню': ['main_view']})
         self.views['select_bot_orders_view'] = SelectBotOrdersView(self, msg='Выберите магазин')
         # self.add_view.next_view = self.main_view
         # self.add_view.main_view = self.main_view
         # if data.get('last_message_id'):
         #     self.ctx.views[self.main_view] = data['last_message_id']
         #if data.get('current_view') and data['current_view'] in self.views:
-        self.set_view(data.get('current_view'))
-        self.views['main_view'].render()
+        self.path = data.get('path')
         if not self.get_current_view():
-            self.route('main_view')
+            self.route(['main_view'])
 
     def start_bot(self, bot_data):
         pass  # TODO
