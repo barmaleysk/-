@@ -113,6 +113,7 @@ class OrderView(View):
         self.ctx = ctx
         self.data = data
         self.editable = True
+        self.message_id = None
 
     def get_msg(self):
         res = 'Заказ #' + str(self.data['number']) + '\n'
