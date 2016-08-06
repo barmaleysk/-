@@ -95,7 +95,7 @@ class ItemNode(View):
         return self.count * self.price
 
     def get_msg(self):
-        return '<a href="' + self.img + '">' + self.name + '</a>\n' + striphtml(self.description)
+        return (u'<a href="' + self.img + u'">' + self.name + u'</a>\n' + striphtml(self.description))[:500]
 
     def process_callback(self, call):
         _id, action = call.data.split(':')[1:]
@@ -233,7 +233,10 @@ class MenuNode(View):
 
     def render_5(self):
         for item in self.items.values()[self.ptr:self.ptr + 5]:
-            item.render()
+            try:
+                item.render()
+            except Exception, e:
+                print e
         self.ptr += 5
 
     def process_message(self, message):
@@ -463,6 +466,7 @@ class MenuCatView(InlineNavigationView):
         self.categories = defaultdict(list)
         for item_data in data:
             self.categories[item_data['cat']].append(item_data)
+        del self.categories[u'']
         self.links = {cat: ['menu_cat_view', cat] for cat in self.categories.keys()}
         self.views = {cat: MenuNode(cat, items, self.ctx, links={"delivery": ['delivery']}) for cat, items in self.categories.items()}
 
@@ -643,7 +647,7 @@ class MainConvo(Convo):
             self.route(['main_view'])
 
     def start_bot(self, bot_data):
-        pass  # TODO
+        MarketBot(bot_data).start()
 
     def process_file(self, doc):
         # try:
