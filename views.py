@@ -139,7 +139,7 @@ class OrderView(View):
             self.data = self.ctx.db.orders.find_one({'_id': self.data['_id']})
             self.render()
         elif action == 'reactivate':
-            self.ctx._db.orders.update_one({'_id': self.data['_id']}, {'$set': {'status': 'В обработке'}})
+            self.ctx.db.orders.update_one({'_id': self.data['_id']}, {'$set': {'status': 'В обработке'}})
             self.data = self.ctx.db.orders.find_one({'_id': self.data['_id']})
             self.render()
 
