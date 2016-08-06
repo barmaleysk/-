@@ -18,6 +18,7 @@ import pandas as pd
 import re
 from views import *
 from vk_crawler import Crawler
+import trollius
 
 
 def striphtml(data):
@@ -701,16 +702,25 @@ class Singleton(object):
 
 class BotProcessor(Singleton):
     queue = set()
+    updates = {}
 
     def register_bot(self, bot):
         self.queue.add(bot)
 
+    @trollius.coroutine
+    def get_updates(self, bot):
+        upd = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
+        self.updates[bot.token] = upd
+
+    @trollius.coroutine
+    def process_updates(self, bot):
+        bot.process_new_updates(self.updates[bot.token])
+
     def step(self):
         for bot in self.queue:
             try:
-                # bot.__retrieve_updates(0)
-                updates = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
-                bot.process_new_updates(updates)
+                trollius.get_event_loop().run_until_complete(self.get_updates(bot))
+                trollius.get_event_loop().run_until_complete(self.process_updates(bot))
             except Exception, e:
                 print e
 
