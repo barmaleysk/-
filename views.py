@@ -83,9 +83,7 @@ class NavigationView(View):
         return self.mk_markup(list(reversed(self.links.keys())))
 
     def process_message(self, message):
-        print message, self.links
         if message in self.links:
-            print 'route to ', self.links[message]
             self.ctx.route(self.links[message])
 
 
@@ -314,7 +312,6 @@ class DetailsView(View):
     def process_message(self, cmd):
         # print cmd
         if cmd == 'ОК':
-            print self.current(), self.current().value
             if isinstance(self.current(), FileDetail) and self.ctx.tmpdata is not None:
                 if self.current().validate(self.ctx.tmpdata):
                     self.current().value = self.ctx.tmpdata

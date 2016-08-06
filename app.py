@@ -101,7 +101,6 @@ class ItemNode(View):
         _id, action = call.data.split(':')[1:]
         if action == 'add':
             self.count += 1
-            print 'add', self.count
             self.render()
         if action == 'basket':
             # print 'got to basket'
@@ -551,7 +550,6 @@ class Convo(object):
                 pass
 
     def process_message(self, message):
-        print self.get_current_view()
         try:
             txt = message.text.encode('utf-8')
         except:
@@ -576,9 +574,7 @@ class Convo(object):
         self.db.convos.update_one({'bot_token': self.bot.token, 'chat_id': self.chat_id}, {'$set': {'path': path}})
 
     def route(self, path):
-        print path
         self.set_path(path)
-        print self.get_current_view()
         self.get_current_view().activate()
 
 
@@ -732,7 +728,6 @@ class MarketBot(object):
     def process_callback(self, callback):
         # print callback.message.chat.id
         convo = self.get_convo(callback.message.chat.id)
-        print self.token, callback.message.chat.id, convo
         convo.process_callback(callback)
 
     def process_message(self, message):
