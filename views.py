@@ -150,7 +150,7 @@ class AdminOrderView(View):
         self.token = bot_token
         self.editable = True
         self.status = status
-        self.orders = [OrderView(self.ctx, o) for o in self.ctx.db.orders.find({'token': self.token, status: status}).sort('date', pymongo.DESCENDING)]
+        self.orders = [OrderView(self.ctx, o) for o in self.ctx.db.orders.find({'token': self.token, 'status': status}).sort('date', pymongo.DESCENDING)]
         self._orders = {}
         for o in self.orders:
             self._orders[str(o.data['number'])] = o
