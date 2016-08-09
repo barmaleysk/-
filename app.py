@@ -118,6 +118,7 @@ class BasketNode(View):
         self.item_ptr = 0
         self.editable = True
         self.ctx.current_basket = self
+        self.min_sum = 1000
 
     def to_dict(self):
         return {
@@ -186,6 +187,8 @@ class BasketNode(View):
             self.add()
         elif action == '-':
             self.sub()
+        elif action == '<<':
+            self.ctx.send_message('Минимальная сумма заказа ' + str(self.min_sum) + ' рублей')
 
     def get_markup(self):
         if self.get_total() > 0:
@@ -196,8 +199,8 @@ class BasketNode(View):
                 self.btn('+', 'basket:+')
             )
             markup.row(self.btn('<', 'basket:<'), self.btn(str(self.item_ptr + 1) + '/' + str(len(self.items)), 'basket:ptr'), self.btn('>', 'basket:>'))
-            if self.get_total() < 1000:
-                    markup.row(self.btn('Минимальная сумма заказа 1000 рублей', ':basket'))
+            if self.get_total() < self.min_sum:
+                    markup.row(self.btn('Минимальная сумма заказа ' + str(self.min_sum) + ' рублей', 'basket:<<'))
             else:
                 markup.row(self.btn('Заказ на ' + str(self.get_total()) + ' р. Оформить?', 'link:delivery'))
             return markup
