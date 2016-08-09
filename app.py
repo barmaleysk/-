@@ -18,7 +18,6 @@ import pandas as pd
 import re
 from views import *
 from vk_crawler import Crawler
-import trollius
 
 
 def striphtml(data):
@@ -197,7 +196,10 @@ class BasketNode(View):
                 self.btn('+', 'basket:+')
             )
             markup.row(self.btn('<', 'basket:<'), self.btn(str(self.item_ptr + 1) + '/' + str(len(self.items)), 'basket:ptr'), self.btn('>', 'basket:>'))
-            markup.row(self.btn('Заказ на ' + str(self.get_total()) + ' р. Оформить?', 'link:delivery'))
+            if self.get_total() < 1000:
+                    markup.row(self.btn('Минимальная сумма заказа 1000 рублей', ':basket'))
+            else:
+                markup.row(self.btn('Заказ на ' + str(self.get_total()) + ' р. Оформить?', 'link:delivery'))
             return markup
         else:
             return None
@@ -316,11 +318,10 @@ class OrderCreatorView(DetailsView):
         order['date'] = datetime.utcnow()
         order['status'] = 'В обработке'
         order['token'] = self.ctx.token
-        order['number'] = len(self.orders) 
+        order['number'] = len(self.orders)
         self.ctx.db.orders.insert_one(order)
         send_order(self.ctx.get_bot_data()['email'], order)
         self.ctx.current_basket = None
-
 
     def activate(self):
         self.filled = False
@@ -328,8 +329,7 @@ class OrderCreatorView(DetailsView):
         super(DetailsView, self).activate()
 
 
-
-class UpdateBotView(BotCreatorView): # TODO: remove
+class UpdateBotView(BotCreatorView):  # TODO: remove
     def activate(self):
         self.filled = False
         self.ptr = 0
@@ -379,14 +379,14 @@ class HistoryItem(object):
 
     def __str__(self):
         res = str(self.order.get('date')).split('.')[0] + '\n\n'
-        res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in self.order['items'] )
+        res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in self.order['items'])
         res += '\n-----\n Итого: ' + str(self.order['total']) + ' руб.'
         res += '\n-----\n Детали доставки: \n-----\n'
         try:
-            res += '\n'.join(k.encode('utf-8') + ': ' + v.encode('utf-8') for k,v in self.order['delivery'].items())
+            res += '\n'.join(k.encode('utf-8') + ': ' + v.encode('utf-8') for k, v in self.order['delivery'].items())
         except:
             try:
-                res += '\n'.join(k + ': ' + v for k,v in self.order['delivery'].items())
+                res += '\n'.join(k + ': ' + v for k, v in self.order['delivery'].items())
             except:
                 pass
         return res
@@ -639,14 +639,13 @@ class MainConvo(Convo):
         # self.add_view.main_view = self.main_view
         # if data.get('last_message_id'):
         #     self.ctx.views[self.main_view] = data['last_message_id']
-        #if data.get('current_view') and data['current_view'] in self.views:
+        # if data.get('current_view') and data['current_view'] in self.views:
         self.path = data.get('path')
         if not self.get_current_view():
             self.route(['main_view'])
 
     def start_bot(self, bot_data):
-        mb = MarketBot(bot_data)
-        BotProcessor().register_bot(mb.bot)
+        MarketBot(bot_data).start()
 
     def process_file(self, doc):
         # try:
@@ -691,45 +690,6 @@ class MainConvo(Convo):
         self.tmpdata = items
 
 
-class Singleton(object):
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(Singleton, cls).__new__(cls, *args, **kwargs)
-        return cls._instance
-
-
-class BotProcessor(Singleton):
-    queue = set()
-    updates = {}
-
-    def register_bot(self, bot):
-        self.queue.add(bot)
-
-    @trollius.coroutine
-    def get_updates(self, bot):
-        upd = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
-        self.updates[bot.token] = upd
-
-    @trollius.coroutine
-    def process_updates(self, bot):
-        bot.process_new_updates(self.updates[bot.token])
-
-    def step(self):
-        for bot in self.queue:
-            try:
-                trollius.get_event_loop().run_until_complete(self.get_updates(bot))
-                trollius.get_event_loop().run_until_complete(self.process_updates(bot))
-            except Exception, e:
-                print e
-
-    def run(self):
-        print self.queue
-        while True:
-            self.step()
-
-
 class MarketBot(object):
     convo_type = MarketBotConvo
 
@@ -764,7 +724,7 @@ class MarketBot(object):
 
     def goto_main(self, message):
         convo = self.get_convo(message.chat.id)
-        convo.route(['main_view'])
+        convo.route('main_view')
 
     def process_callback(self, callback):
         # print callback.message.chat.id
@@ -781,11 +741,14 @@ class MarketBot(object):
         convo = self.get_convo(chat_id)
         convo.process_file(doc)
 
+    def _start_bot(self):
+        self.bot.polling(interval=0.25)
+
     def start(self):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        BotProcessor().register_bot(self.bot)
+        Process(target=self.bot.polling).start()
 
 
 class MasterBot(MarketBot):
@@ -798,8 +761,7 @@ class MasterBot(MarketBot):
         for bot_data in self.get_db().bots.find():
             m = MarketBot(bot_data)
             m.start()
-        BotProcessor().register_bot(self.bot)
-        BotProcessor().run()
+        Process(target=self.bot.polling).start()
 
 
 if __name__ == "__main__":
