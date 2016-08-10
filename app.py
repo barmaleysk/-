@@ -703,31 +703,21 @@ class Singleton(object):
 class BotProcessor(Singleton):
     queue = set()
     updates = {}
+    loop = trollius.get_event_loop()
 
     def register_bot(self, bot):
-        self.queue.add(bot)
+        self.loop.call_soon(self.get_updates, bot)
 
-    @trollius.coroutine
     def get_updates(self, bot):
         upd = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
-        self.updates[bot.token] = upd
+        self.loop.call_soon(self.process_updates, bot, upd)
 
-    @trollius.coroutine
-    def process_updates(self, bot):
+    def process_updates(self, bot, upd):
         bot.process_new_updates(self.updates[bot.token])
 
-    def step(self):
-        for bot in self.queue:
-            try:
-                trollius.get_event_loop().run_until_complete(self.get_updates(bot))
-                trollius.get_event_loop().run_until_complete(self.process_updates(bot))
-            except Exception, e:
-                print e
-
     def run(self):
-        print self.queue
-        while True:
-            self.step()
+        self.loop.run_forever()
+        loop.close()
 
 
 class MarketBot(object):
