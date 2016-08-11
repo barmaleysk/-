@@ -200,6 +200,15 @@ class TextDetail(Detail):
     pass
 
 
+class NumberDetail(Detail):
+    def validate(self, value):
+        try:
+            int(value)
+            return True
+        except ValueError:
+            return False
+
+
 class TokenDetail(TextDetail):
     def validate(self, value):
         if self.ctx.db.bots.find_one({'token': value}) is not None:
@@ -327,13 +336,20 @@ class DetailsView(View):
             self.prev()
         elif cmd == 'главное меню':
             self.ctx.route(['main_view'])
+        elif isinstance(self.current(), TextDetail):
+            if self.current().validate(cmd):
+                self.current().value = cmd
+                self.next()
+            else:
+                self.ctx.send_message('Неверный формат')
         else:
-            if isinstance(self.current(), TextDetail):
+            if isinstance(self.current(), NumberDetail):
                 if self.current().validate(cmd):
                     self.current().value = cmd
                     self.next()
                 else:
-                    self.ctx.send_message('Неверный формат')
+                    self.ctx.send_message('Введите целое число')
+
             # elif isinstance(self.current(), FileDetail):
             #     if 'vk.com' in cmd:
             #         try:
