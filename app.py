@@ -818,12 +818,12 @@ class MasterBot(MarketBot):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        for bot_data in self.get_db().bots.find():
-            try:
-                m = MarketBot(bot_data)
-                m.start()
-            except:
-                pass
+        # for bot_data in self.get_db().bots.find():
+        #     try:
+        #         m = MarketBot(bot_data)
+        #         m.start()
+        #     except:
+        #         pass
         WebhookProcessor().register_bot(self)
         WebhookProcessor().run()
 
