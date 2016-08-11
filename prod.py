@@ -7,7 +7,10 @@
 import flask
 import telebot
 import logging
-from app import MasterBot, Singleton
+from app import MasterBot, MarketBot
+from pymongo import MongoClient
+
+db = MongoClient('localhost', 27017, connect=False)['marketbot']
 
 
 # API_TOKEN = '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'
@@ -38,20 +41,29 @@ app = flask.Flask(__name__)
 bots = {}
 
 
-class WebhookProcessor(Singleton):
+# class WebhookProcessor(Singleton):
 
-    def register_bot(self, bot):
-        bot.remove_webhook()
-        print 'registered bot at ', WEBHOOK_URL_BASE + '/' + bot.token + '/'
-        bot.set_webhook(url=WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(WEBHOOK_SSL_CERT, 'r'))
+def register_bot(self, bot):
+    bot.remove_webhook()
+    print 'registered bot at ', WEBHOOK_URL_BASE + '/' + bot.token + '/'
+    bot.set_webhook(url=WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(WEBHOOK_SSL_CERT, 'r'))
+    bots[bot.token] = bot
 
-    def get_bot(self, token):
-        if token in bots:
-            return bots[token]
-        return None
+
+# INIT
 
 mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})
-mb.bot_manager = WebhookProcessor()
+mb.start()
+register_bot(mb.bot)
+
+
+for bot_data in db.bots.find():
+    try:
+        m = MarketBot(bot_data)
+        m.start()
+        register_bot(m.bot)
+    except Exception, e:
+        print e
 
 
 # Empty webserver index, return nothing, just http 200
@@ -67,8 +79,8 @@ def webhook(token):
     if flask.request.headers.get('content-type') == 'application/json':
         json_string = flask.request.get_data().encode('utf-8')
         update = telebot.types.Update.de_json(json_string)
-        if token == mb.bot.token:
-            mb.bot.process_new_messages([update.message])
+        if token in bots:
+            bots[token].process_new_messages([update.message])
         # if token in bots:
         #     bots[token].process_new_messages([update.message])
         return ''
@@ -84,7 +96,6 @@ def webhook(token):
                 # certificate=open(WEBHOOK_SSL_CERT, 'r'))
 
 if __name__ == "__main__":
-    mb.start()
 
     # Start flask server
     app.run(

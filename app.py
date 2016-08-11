@@ -801,25 +801,16 @@ class MarketBot(object):
             self.init_convo(convo_data)
         # self.bot_manager.register_bot(self.bot)
 
-    def webhook_handler(self):
-        if flask.request.headers.get('content-type') == 'application/json':
-            json_string = flask.request.get_data().encode('utf-8')
-            update = telebot.types.Update.de_json(json_string)
-            self.bot.process_new_messages([update.message])
-            return ''
-        else:
-            flask.abort(403)
-
 
 class MasterBot(MarketBot):
     convo_type = MainConvo
 
-    def start(self):
-        self.__bots = {}
-        self._init_bot()
-        for convo_data in self.get_db().convos.find({'bot_token': self.token}):
-            self.init_convo(convo_data)
-        self.bot_manager.register_bot(self.bot)
+    # def start(self):
+    #     self.__bots = {}
+    #     self._init_bot()
+    #     for convo_data in self.get_db().convos.find({'bot_token': self.token}):
+    #         self.init_convo(convo_data)
+        # self.bot_manager.register_bot(self.bot)
         # for bot_data in self.get_db().bots.find():
         #     try:
         #         m = MarketBot(bot_data)
@@ -829,11 +820,11 @@ class MasterBot(MarketBot):
         #     except Exception, e:
         #         print e
 
-    def route(self, token):
-        if token == self.bot.token:
-            return self.bot
-        elif token in self.__bots:
-            return self.__bots[token].bot
+    # def route(self, token):
+    #     if token == self.bot.token:
+    #         return self.bot
+    #     elif token in self.__bots:
+    #         return self.__bots[token].bot
 
 
 # if __name__ == "__main__":
