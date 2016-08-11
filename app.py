@@ -824,7 +824,7 @@ class MasterBot(MarketBot):
             try:
                 m = MarketBot(bot_data)
                 m.start()
-                self.bot_manager.register_bot(m)
+                self.bot_manager.register_bot(m.bot)
                 self.__bots[bot_data['token']] = m
             except Exception, e:
                 print e
