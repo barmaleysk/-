@@ -81,6 +81,7 @@ def webhook(token):
         update = telebot.types.Update.de_json(json_string)
         if token in bots:
             bots[token].process_new_messages([update.message])
+            print 'processed'
         # if token in bots:
         #     bots[token].process_new_messages([update.message])
         return ''
