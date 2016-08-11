@@ -59,7 +59,7 @@ def index():
 
 
 # Process webhook calls
-@app.route('/<token>', methods=['POST'])
+@app.route('/<token>/', methods=['POST'])
 def webhook(token):
     print 'ok!'
     if flask.request.headers.get('content-type') == 'application/json':
