@@ -733,6 +733,7 @@ class WebhookProcessor(Singleton):
 
     def register_bot(self, bot):
         self.app.add_url_rule('/' + bot.token, bot.token, bot.webhook_handler, methods=['POST'])
+        print 'registered bot at ' + self.WEBHOOK_URL_BASE + '/' + bot.bot.token + '/'
         bot.bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.bot.token + '/')
 
     def run(self):
@@ -818,8 +819,11 @@ class MasterBot(MarketBot):
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
         for bot_data in self.get_db().bots.find():
-            m = MarketBot(bot_data)
-            m.start()
+            try:
+                m = MarketBot(bot_data)
+                m.start()
+            except:
+                pass
         WebhookProcessor().register_bot(self)
         WebhookProcessor().run()
 
