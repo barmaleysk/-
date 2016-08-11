@@ -819,6 +819,7 @@ class MasterBot(MarketBot):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
+        self.bot_manager.register_bot(self.bot)
         # for bot_data in self.get_db().bots.find():
         #     try:
         #         m = MarketBot(bot_data)
