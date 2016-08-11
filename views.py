@@ -357,6 +357,13 @@ class BotCreatorView(DetailsView):
         dd = {}
         for d in self.details:
             dd[d._id] = d.value
-        bot_data = {'admin': self.ctx.bot.bot.get_chat(self.ctx.chat_id).username, 'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id, 'delivery_info': dd['shop.delivery_info'], 'contacts_info': dd['shop.contacts_info']}
+        bot_data = {'admin': self.ctx.bot.bot.get_chat(self.ctx.chat_id).username,
+                    'token': dd['shop.token'],
+                    'items': dd['shop.items'],
+                    'email': dd['shop.email'],
+                    'chat_id': self.ctx.chat_id,
+                    'delivery_info': dd['shop.delivery_info'],
+                    'contacts_info': dd['shop.contacts_info'],
+                    'total_threshold': dd['shop.total_threshold']}
         self.ctx.db.bots.save(bot_data)
         self.ctx.start_bot(bot_data)

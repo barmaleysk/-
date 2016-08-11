@@ -118,7 +118,7 @@ class BasketNode(View):
         self.item_ptr = 0
         self.editable = True
         self.ctx.current_basket = self
-        self.min_sum = 1000
+        self.total_threshold = int(self.ctx.get_bot_data().get('total_threshold'))
 
     def to_dict(self):
         return {
@@ -188,7 +188,7 @@ class BasketNode(View):
         elif action == '-':
             self.sub()
         elif action == '<<':
-            self.ctx.send_message('Минимальная сумма заказа ' + str(self.min_sum) + ' рублей')
+            self.ctx.send_message('Минимальная сумма заказа ' + str(self.total_threshold) + ' рублей')
 
     def get_markup(self):
         if self.get_total() > 0:
@@ -199,8 +199,8 @@ class BasketNode(View):
                 self.btn('+', 'basket:+')
             )
             markup.row(self.btn('<', 'basket:<'), self.btn(str(self.item_ptr + 1) + '/' + str(len(self.items)), 'basket:ptr'), self.btn('>', 'basket:>'))
-            if self.get_total() < self.min_sum:
-                    markup.row(self.btn('Минимальная сумма заказа ' + str(self.min_sum) + ' рублей', 'basket:<<'))
+            if self.get_total() < self.total_threshold:
+                markup.row(self.btn('Минимальная сумма заказа ' + str(self.total_threshold) + ' рублей', 'basket:<<'))
             else:
                 markup.row(self.btn('Заказ на ' + str(self.get_total()) + ' р. Оформить?', 'link:delivery'))
             return markup
@@ -342,7 +342,14 @@ class UpdateBotView(BotCreatorView):  # TODO: remove
         dd = {}
         for d in self.details:
             dd[d._id] = d.value
-        bot_data = {'admin': self.ctx.bot.bot.get_chat(self.ctx.chat_id).username, 'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id, 'delivery_info': dd['shop.delivery_info'], 'contacts_info': dd['shop.contacts_info']}
+        bot_data = {'admin': self.ctx.bot.bot.get_chat(self.ctx.chat_id).username,
+                    'token': dd['shop.token'],
+                    'items': dd['shop.items'],
+                    'email': dd['shop.email'],
+                    'chat_id': self.ctx.chat_id,
+                    'delivery_info': dd['shop.delivery_info'],
+                    'contacts_info': dd['shop.contacts_info'],
+                    'total_threshold': dd['shop.total_threshold']}
         self.ctx.db.bots.update_one({'token': dd['shop.token']}, {"$set": bot_data})
 
 
@@ -361,7 +368,8 @@ class BotSettingsView(NavigationView):
                     EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
                     FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>'),
                     TextDetail('shop.delivery_info', name='текст с условиями доставки', value=bot.get('delivery_info')),
-                    TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info'))
+                    TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info')),
+                    TextDetail('shop.total_threshold', name='минимальную сумму заказа', value=bot.get('total_threshold'))
                 ], final_message='Магазин сохранен!')
 
             return self.views[token]
@@ -634,7 +642,8 @@ class MainConvo(Convo):
             EmailDetail('shop.email', name='email для приема заказов', ctx=self),
             FileDetail('shop.items', name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>'),
             TextDetail('shop.delivery_info', name='текст с условиями доставки'),
-            TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + str(self.bot.bot.get_chat(self.chat_id).username))
+            TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + str(self.bot.bot.get_chat(self.chat_id).username)),
+            TextDetail('shop.total_threshold', name='минимальную сумму заказа', value='0')
         ], final_message='Магазин создан!')
         self.views['settings_view'] = BotSettingsView(self, msg='Настройки', links={'Главное меню': ['main_view']})
         self.views['select_bot_orders_view'] = SelectBotOrdersView(self, msg='Выберите магазин')
@@ -706,6 +715,7 @@ class MarketBot(object):
     def get_db(self):
         self.db = self.db or MongoClient('localhost', 27017, connect=False)
         return self.db['marketbot']
+        print(self.db['marketbot'])
 
     def _init_bot(self, threaded=False):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)

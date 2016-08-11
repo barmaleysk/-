@@ -11,6 +11,7 @@ class Item(EmbeddedDocument):
     price = IntField()
     img = StringField()
 
+
 class Bot(Document):
     meta = {'collection': 'bots'}
     email = EmailField()
