@@ -822,10 +822,10 @@ class MasterBot(MarketBot):
         self.bot_manager.register_bot(self.bot)
         for bot_data in self.get_db().bots.find():
             try:
-                m = MarketBot(bot_data)
+                m = MarketBot(bot_data, self.bot_manager)
                 m.start()
-            except:
-                pass
+            except Exception, e:
+                print e
 
 
 # if __name__ == "__main__":
