@@ -35,20 +35,20 @@ logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
 
 app = flask.Flask(__name__)
+bots = {}
 
 
 class WebhookProcessor(Singleton):
-    bots = {}
 
     def register_bot(self, bot):
         bot.remove_webhook()
         print 'registered bot at ', WEBHOOK_URL_BASE + '/' + bot.token + '/'
         bot.set_webhook(url=WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(WEBHOOK_SSL_CERT, 'r'))
-        self.bots[bot.token] = bot
+        bots[bot.token] = bot
 
     def get_bot(self, token):
-        if token in self.bots:
-            return self.bots[token]
+        if token in bots:
+            return bots[token]
         return None
 
 
