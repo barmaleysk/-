@@ -19,6 +19,7 @@ import re
 from views import *
 from vk_crawler import Crawler
 import trollius
+import flask
 
 
 def striphtml(data):
@@ -700,24 +701,45 @@ class Singleton(object):
         return cls._instance
 
 
-class BotProcessor(Singleton):
-    queue = set()
-    updates = {}
-    loop = trollius.get_event_loop()
+# class BotProcessor(Singleton):
+#     queue = set()
+#     updates = {}
+#     loop = trollius.get_event_loop()
+
+#     def register_bot(self, bot):
+#         self.loop.call_soon(self.get_updates, bot)
+
+#     def get_updates(self, bot):
+#         upd = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
+#         self.loop.call_soon(self.process_updates, bot, upd)
+
+#     def process_updates(self, bot, upd):
+#         bot.process_new_updates(self.updates[bot.token])
+
+#     def run(self):
+#         self.loop.run_forever()
+#         loop.close()
+
+
+class WebhookProcessor(Singleton):
+    WEBHOOK_HOST = 'ec2-52-34-35-240.us-west-2.compute.amazonaws.com'
+    WEBHOOK_PORT = 8443  # 443, 80, 88 or 8443 (port need to be 'open')
+    WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
+    WEBHOOK_SSL_CERT = '/home/ubuntu/webhook_cert.pem'  # Path to the ssl certificate
+    WEBHOOK_SSL_PRIV = '/home/ubuntu/webhook_pkey.pem'  # Path to the ssl private key
+
+    app = flask.Flask(__name__)
 
     def register_bot(self, bot):
-        self.loop.call_soon(self.get_updates, bot)
-
-    def get_updates(self, bot):
-        upd = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
-        self.loop.call_soon(self.process_updates, bot, upd)
-
-    def process_updates(self, bot, upd):
-        bot.process_new_updates(self.updates[bot.token])
+        app.add_url_rule('/' + bot.token, bot.token, bot.webhook_handler, methods=['POST'])
+        bot.bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.bot.token + '/')
 
     def run(self):
-        self.loop.run_forever()
-        loop.close()
+        self.app.run(
+            host=self.WEBHOOK_LISTEN,
+            port=self.WEBHOOK_PORT,
+            ssl_context=(self.WEBHOOK_SSL_CERT, self.WEBHOOK_SSL_PRIV),
+            debug=True)
 
 
 class MarketBot(object):
@@ -775,7 +797,16 @@ class MarketBot(object):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        BotProcessor().register_bot(self.bot)
+        WebhookProcessor().register_bot(self)
+
+    def webhook_handler(self):
+        if flask.request.headers.get('content-type') == 'application/json':
+            json_string = flask.request.get_data().encode('utf-8')
+            update = telebot.types.Update.de_json(json_string)
+            self.bot.process_new_messages([update.message])
+            return ''
+        else:
+            flask.abort(403)
 
 
 class MasterBot(MarketBot):
@@ -788,8 +819,8 @@ class MasterBot(MarketBot):
         for bot_data in self.get_db().bots.find():
             m = MarketBot(bot_data)
             m.start()
-        BotProcessor().register_bot(self.bot)
-        BotProcessor().run()
+        WebhookProcessor().register_bot(self)
+        WebhookProcessor().run()
 
 
 if __name__ == "__main__":
