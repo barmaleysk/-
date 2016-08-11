@@ -753,6 +753,7 @@ class MarketBot(object):
         self.convos = {}
         self.db = None
         self.email = data.get('email')
+        self.bot_manager = bot_manager
 
     def get_db(self):
         self.db = self.db or MongoClient('localhost', 27017, connect=False)
