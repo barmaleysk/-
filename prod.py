@@ -43,7 +43,7 @@ bots = {}
 
 # class WebhookProcessor(Singleton):
 
-def register_bot(self, bot):
+def register_bot(bot):
     bot.remove_webhook()
     print 'registered bot at ', WEBHOOK_URL_BASE + '/' + bot.token + '/'
     bot.set_webhook(url=WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(WEBHOOK_SSL_CERT, 'r'))
