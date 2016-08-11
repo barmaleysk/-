@@ -647,7 +647,7 @@ class MainConvo(Convo):
 
     def start_bot(self, bot_data):
         mb = MarketBot(bot_data)
-        BotProcessor().register_bot(mb.bot)
+        WebhookProcessor().register_bot(mb.bot)
 
     def process_file(self, doc):
         # try:
@@ -731,7 +731,7 @@ class WebhookProcessor(Singleton):
     app = flask.Flask(__name__)
 
     def register_bot(self, bot):
-        app.add_url_rule('/' + bot.token, bot.token, bot.webhook_handler, methods=['POST'])
+        self.app.add_url_rule('/' + bot.token, bot.token, bot.webhook_handler, methods=['POST'])
         bot.bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.bot.token + '/')
 
     def run(self):
