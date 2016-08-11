@@ -701,24 +701,24 @@ class Singleton(object):
         return cls._instance
 
 
-# class BotProcessor(Singleton):
-#     queue = set()
-#     updates = {}
-#     loop = trollius.get_event_loop()
+class BotProcessor(Singleton):
+    queue = set()
+    updates = {}
+    loop = trollius.get_event_loop()
 
-#     def register_bot(self, bot):
-#         self.loop.call_soon(self.get_updates, bot)
+    def register_bot(self, bot):
+        self.loop.call_soon(self.get_updates, bot)
 
-#     def get_updates(self, bot):
-#         upd = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
-#         self.loop.call_soon(self.process_updates, bot, upd)
+    def get_updates(self, bot):
+        upd = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
+        self.loop.call_soon(self.process_updates, bot, upd)
 
-#     def process_updates(self, bot, upd):
-#         bot.process_new_updates(self.updates[bot.token])
+    def process_updates(self, bot, upd):
+        bot.process_new_updates(self.updates[bot.token])
 
-#     def run(self):
-#         self.loop.run_forever()
-#         loop.close()
+    def run(self):
+        self.loop.run_forever()
+        loop.close()
 
 
 class WebhookProcessor(Singleton):
@@ -732,7 +732,7 @@ class WebhookProcessor(Singleton):
     app = flask.Flask(__name__)
 
     def register_bot(self, bot):
-        self.app.add_url_rule('/' + bot.token, bot.token, bot.webhook_handler, methods=['POST'])
+        self.app.add_url_rule('/' + bot.token, bot.token, bot.webhook_handler)
         print 'registered bot at ' + self.WEBHOOK_URL_BASE + '/' + bot.bot.token + '/'
         bot.bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.bot.token + '/')
 
@@ -747,12 +747,13 @@ class WebhookProcessor(Singleton):
 class MarketBot(object):
     convo_type = MarketBotConvo
 
-    def __init__(self, data):
+    def __init__(self, data, bot_manager=BotProcessor()):
         self.token = data['token']
         self.data = data
         self.convos = {}
         self.db = None
         self.email = data.get('email')
+        self.bot_manager = bot_manager
 
     def get_db(self):
         self.db = self.db or MongoClient('localhost', 27017, connect=False)
@@ -799,7 +800,7 @@ class MarketBot(object):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        WebhookProcessor().register_bot(self)
+        self.bot_manager.register_bot(self.bot)
 
     def webhook_handler(self):
         if flask.request.headers.get('content-type') == 'application/json':
@@ -824,11 +825,10 @@ class MasterBot(MarketBot):
         #         m.start()
         #     except:
         #         pass
-        WebhookProcessor().register_bot(self)
 
 
-if __name__ == "__main__":
-    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
-    mb.start()
-    WebhookProcessor().run()
+# if __name__ == "__main__":
+#     mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
+#     mb.start()
+#     WebhookProcessor().run()
 
