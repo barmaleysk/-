@@ -825,9 +825,9 @@ class MasterBot(MarketBot):
         #     except:
         #         pass
         WebhookProcessor().register_bot(self)
-        WebhookProcessor().run()
 
 
 if __name__ == "__main__":
     mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
+    WebhookProcessor().run()
     mb.start()
