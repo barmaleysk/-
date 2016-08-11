@@ -831,9 +831,9 @@ class MasterBot(MarketBot):
 
     def route(self, token):
         if token == self.bot.token:
-            return self
+            return self.bot
         elif token in self.__bots:
-            return self.__bots[token]
+            return self.__bots[token].bot
 
 
 # if __name__ == "__main__":
