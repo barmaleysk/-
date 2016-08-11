@@ -67,7 +67,8 @@ def webhook(token):
     if flask.request.headers.get('content-type') == 'application/json':
         json_string = flask.request.get_data().encode('utf-8')
         update = telebot.types.Update.de_json(json_string)
-        mb.route(token).process_new_messages([update.message])
+        if token == mb.bot.token:
+            mb.bot.process_update([update])
         # if token in bots:
         #     bots[token].process_new_messages([update.message])
         return ''
