@@ -44,12 +44,14 @@ class WebhookProcessor(Singleton):
         bot.remove_webhook()
         print 'registered bot at ', WEBHOOK_URL_BASE + '/' + bot.token + '/'
         bot.set_webhook(url=WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(WEBHOOK_SSL_CERT, 'r'))
-        bots[bot.token] = bot
 
     def get_bot(self, token):
         if token in bots:
             return bots[token]
         return None
+
+mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})
+mb.bot_manager = WebhookProcessor()
 
 
 # Empty webserver index, return nothing, just http 200
@@ -65,8 +67,9 @@ def webhook(token):
     if flask.request.headers.get('content-type') == 'application/json':
         json_string = flask.request.get_data().encode('utf-8')
         update = telebot.types.Update.de_json(json_string)
-        if token in bots:
-            bots[token].process_new_messages([update.message])
+        mb.route(token).process_new_messages([update.message])
+        # if token in bots:
+        #     bots[token].process_new_messages([update.message])
         return ''
     else:
         flask.abort(403)
@@ -80,7 +83,6 @@ def webhook(token):
                 # certificate=open(WEBHOOK_SSL_CERT, 'r'))
 
 if __name__ == "__main__":
-    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"}, WebhookProcessor())
     mb.start()
 
     # Start flask server

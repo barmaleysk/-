@@ -747,13 +747,12 @@ class WebhookProcessor(Singleton):
 class MarketBot(object):
     convo_type = MarketBotConvo
 
-    def __init__(self, data, bot_manager=BotProcessor()):
+    def __init__(self, data):
         self.token = data['token']
         self.data = data
         self.convos = {}
         self.db = None
         self.email = data.get('email')
-        self.bot_manager = bot_manager
 
     def get_db(self):
         self.db = self.db or MongoClient('localhost', 27017, connect=False)
@@ -800,7 +799,7 @@ class MarketBot(object):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        self.bot_manager.register_bot(self.bot)
+        # self.bot_manager.register_bot(self.bot)
 
     def webhook_handler(self):
         if flask.request.headers.get('content-type') == 'application/json':
@@ -816,16 +815,25 @@ class MasterBot(MarketBot):
     convo_type = MainConvo
 
     def start(self):
+        self.__bots = {}
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
         self.bot_manager.register_bot(self.bot)
         for bot_data in self.get_db().bots.find():
             try:
-                m = MarketBot(bot_data, self.bot_manager)
+                m = MarketBot(bot_data)
                 m.start()
+                self.bot_manager.register_bot(m)
+                self.__bots[bot_data['token']] = m
             except Exception, e:
                 print e
+
+    def route(self, token):
+        if token == self.bot.token:
+            return self
+        elif token in self.__bots:
+            return self.__bots[token]
 
 
 # if __name__ == "__main__":
