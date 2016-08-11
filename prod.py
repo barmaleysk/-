@@ -42,6 +42,7 @@ class WebhookProcessor(Singleton):
 
     def register_bot(self, bot):
         bot.remove_webhook()
+        print 'registered bot at ', WEBHOOK_URL_BASE + '/' + bot.token + '/'
         bot.set_webhook(url=WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(WEBHOOK_SSL_CERT, 'r'))
         self.bots[bot.token] = bot
 
@@ -64,7 +65,7 @@ def webhook(token):
     if flask.request.headers.get('content-type') == 'application/json':
         json_string = flask.request.get_data().encode('utf-8')
         update = telebot.types.Update.de_json(json_string)
-        WebhookProcessor.get_bot(token).process_new_messages([update.message])
+        WebhookProcessor().get_bot(token).process_new_messages([update.message])
         return ''
     else:
         flask.abort(403)
