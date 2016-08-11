@@ -747,7 +747,7 @@ class WebhookProcessor(Singleton):
 class MarketBot(object):
     convo_type = MarketBotConvo
 
-    def __init__(self, data):
+    def __init__(self, data, bot_manager):
         self.token = data['token']
         self.data = data
         self.convos = {}
@@ -799,26 +799,24 @@ class MarketBot(object):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        # self.bot_manager.register_bot(self.bot)
+        self.bot_manager.register_bot(self.bot)
 
 
 class MasterBot(MarketBot):
     convo_type = MainConvo
 
-    # def start(self):
-    #     self.__bots = {}
-    #     self._init_bot()
-    #     for convo_data in self.get_db().convos.find({'bot_token': self.token}):
-    #         self.init_convo(convo_data)
-        # self.bot_manager.register_bot(self.bot)
-        # for bot_data in self.get_db().bots.find():
-        #     try:
-        #         m = MarketBot(bot_data)
-        #         m.start()
-        #         self.bot_manager.register_bot(m.bot)
-        #         self.__bots[bot_data['token']] = m
-        #     except Exception, e:
-        #         print e
+    def start(self):
+        self._init_bot()
+        for convo_data in self.get_db().convos.find({'bot_token': self.token}):
+            self.init_convo(convo_data)
+        self.bot_manager.register_bot(self.bot)
+
+        for bot_data in self.get_db().bots.find():
+            try:
+                m = MarketBot(bot_data, self.bot_manager)
+                m.start()
+            except Exception, e:
+                print e
 
     # def route(self, token):
     #     if token == self.bot.token:
