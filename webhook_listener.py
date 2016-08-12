@@ -19,7 +19,10 @@ class WebhookRegister(Singleton):
         bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(self.WEBHOOK_SSL_CERT, 'r'))
 
     def register_bot_by_redis(self, data):
-        self.set_webhook(data['data'])
+        try:
+            self.set_webhook(data['data'])
+        except Exception, e:
+            print e
 
 CherryPyWSGIServer.ssl_certificate = "/home/ubuntu/webhook_cert.pem"
 CherryPyWSGIServer.ssl_private_key = "/home/ubuntu/webhook_pkey.pem"
