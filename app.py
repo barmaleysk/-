@@ -696,11 +696,6 @@ class Singleton(object):
         return cls._instance
 
 
-class BotManagerBase(Singleton):
-    def register_bot(self, bot):
-        pass
-
-
 class MarketBot(object):
     convo_type = MarketBotConvo
 

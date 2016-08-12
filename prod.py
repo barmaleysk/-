@@ -1,20 +1,20 @@
 import web
 from web.wsgiserver import CherryPyWSGIServer
-from app import MasterBot, BotManagerBase
+from app import MasterBot, Singleton
 import telebot
 
 WEBHOOK_PORT = 8443
 WEBHOOK_HOST = 'ec2-52-34-35-240.us-west-2.compute.amazonaws.com'
 WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
 
-CherryPyWSGIServer.ssl_certificate = WEBHOOK_SSL_CERT = '/home/ubuntu/webhook_cert.pem'
-CherryPyWSGIServer.ssl_private_key = WEBHOOK_SSL_PKEY = "/home/ubuntu/webhook_pkey.pem"
+WEBHOOK_SSL_CERT = CherryPyWSGIServer.ssl_certificate = '/home/ubuntu/webhook_cert.pem'
+WEBHOOK_SSL_PKEY = CherryPyWSGIServer.ssl_private_key = "/home/ubuntu/webhook_pkey.pem"
 
 urls = ("/.*", "hello")
 app = web.application(urls, globals())
 
 
-class BotManager(BotManagerBase):
+class WebHookBotManager(Singleton):
     bots = {}
 
     def register_bot(self, bot):
@@ -35,10 +35,10 @@ class hello:
         token = web.ctx.path.split('/')[1]
         data = web.data()
         update = telebot.types.Update.de_json(data.encode('utf-8'))
-        BotManager().process_update(token, update)
+        WebHookBotManager().process_update(token, update)
         return '!'
 
 if __name__ == "__main__":
-    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"}, BotManager())
+    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"}, WebHookBotManager())
     mb.start()
     app.run()

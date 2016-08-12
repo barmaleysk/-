@@ -1,7 +1,7 @@
-from app import MasterBot, BotManagerBase
+from app import MasterBot, Singleton
 
 
-class BotManager(BotManagerBase):
+class SimpleBotManager(Singleton):
     bots = set()
 
     def register_bot(self, bot):
@@ -15,6 +15,6 @@ class BotManager(BotManagerBase):
 
 
 if __name__ == "__main__":
-    mb = MasterBot({'token': open('token.dev').read()}, BotManager())  # test
+    mb = MasterBot({'token': open('token.dev').read()}, SimpleBotManager())  # test
     mb.start()
-    BotManager().run()
+    SimpleBotManager().run()
