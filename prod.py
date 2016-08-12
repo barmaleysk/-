@@ -41,4 +41,4 @@ class hello:
 if __name__ == "__main__":
     mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"}, BotManager())
     mb.start()
-    app.run(port=8433)
+    app.run()
