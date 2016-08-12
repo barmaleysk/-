@@ -39,8 +39,8 @@ class hello:
         return '!'
 
 if __name__ == "__main__":
-    app.run()
-    mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
-    mb.start()
     VKListener().start()
+    mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
     Listener(mb.process_vk_output, ['vk_output']).start()
+    mb.start()
+    app.run()
