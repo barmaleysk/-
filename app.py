@@ -249,12 +249,13 @@ class MasterBot(MarketBot):
     def start(self):
         super(MasterBot, self).start()
         VKListener().start()
-        ll = Listener(self.process_vk_output, ['vk_output'])
-        ll.daemon = False
-        ll.start()
+        Listener(self.process_vk_output, ['vk_output']).start()
 
         for bot_data in self.db.bots.find():
             try:
                 self.start_bot(bot_data)
             except Exception, e:
                 print e
+
+        while True:
+            pass
