@@ -30,12 +30,6 @@ class BotManager(Singleton):
         return ''
 
 
-mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
-mb.start()
-VKListener().start()
-Listener(mb.process_vk_output, ['vk_output']).start()
-
-
 class hello:
     def POST(self):
         token = web.ctx.path.split('/')[1]
@@ -46,3 +40,7 @@ class hello:
 
 if __name__ == "__main__":
     app.run()
+    mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
+    mb.start()
+    VKListener().start()
+    Listener(mb.process_vk_output, ['vk_output']).start()
