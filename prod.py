@@ -30,6 +30,7 @@ class BotManager(Singleton):
         return ''
 
 mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
+mb.start()
 
 
 class hello:
@@ -43,5 +44,4 @@ class hello:
 if __name__ == "__main__":
     VKListener().start()
     Listener(mb.process_vk_output, ['vk_output']).start()
-    mb.start()
     app.run()
