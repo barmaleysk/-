@@ -252,6 +252,9 @@ class DetailsView(View):
         self.ptr = 0
         super(DetailsView, self).activate()
 
+    def details_dict(self):
+        return {d._id: d.value for d in self.details}
+
     def prefinalize(self):
         pass
 
@@ -354,16 +357,22 @@ class DetailsView(View):
 
 class BotCreatorView(DetailsView):
     def prefinalize(self):
-        dd = {}   # TODO
-        for d in self.details:
-            dd[d._id] = d.value
-        self.final_message += '\n Ссылка на бота: @' + telebot.TeleBot(dd['shop.token']).get_me().username.encode('utf-8')
+        self.final_message += '\n Ссылка на бота: @' + telebot.TeleBot(self.details_dict()['shop.token']).get_me().username.encode('utf-8')
+
+    def bot_data(self):
+        dd = self.details_dict()
+        return {
+            'admin': self.ctx.bot.bot.get_chat(self.ctx.chat_id).username,
+            'token': dd['shop.token'],
+            'items': dd['shop.items'],
+            'email': dd['shop.email'],
+            'chat_id': self.ctx.chat_id,
+            'delivery_info': dd['shop.delivery_info'],
+            'contacts_info': dd['shop.contacts_info']
+        }
 
     def finalize(self):
-        dd = {}
-        for d in self.details:
-            dd[d._id] = d.value
-        bot_data = {'admin': self.ctx.bot.bot.get_chat(self.ctx.chat_id).username, 'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id, 'delivery_info': dd['shop.delivery_info'], 'contacts_info': dd['shop.contacts_info']}
+        bot_data = self.bot_data()
         self.ctx.db.bots.save(bot_data)
         self.ctx.bot.start_bot(bot_data)
 
@@ -620,16 +629,12 @@ class OrderCreatorView(DetailsView):
             TextDetail('delivery_time', name='желаемое время доставки', ctx=self.ctx)
         ]
 
-        # for d in self.details:
-        #     print d.value, d.is_filled()
-
     def activate(self):
         self.filled = False
         self.ptr = 0
         super(DetailsView, self).activate()
 
     def finalize(self):
-        # print str(self.ctx.current_basket)
         order = self.ctx.current_basket.to_dict()
         order['delivery'] = {}
         for d in self.details:
@@ -643,18 +648,15 @@ class OrderCreatorView(DetailsView):
         self.ctx.current_basket = None
 
 
-class UpdateBotView(BotCreatorView):  # TODO: remove
+class UpdateBotView(BotCreatorView):
     def activate(self):
         self.filled = False
         self.ptr = 0
         super(DetailsView, self).activate()
 
     def finalize(self):
-        dd = {}
-        for d in self.details:
-            dd[d._id] = d.value
-        bot_data = {'admin': self.ctx.bot.bot.get_chat(self.ctx.chat_id).username, 'token': dd['shop.token'], 'items': dd['shop.items'], 'email': dd['shop.email'], 'chat_id': self.ctx.chat_id, 'delivery_info': dd['shop.delivery_info'], 'contacts_info': dd['shop.contacts_info']}
-        self.ctx.db.bots.update_one({'token': dd['shop.token']}, {"$set": bot_data})
+        bot_data = self.bot_data()
+        self.ctx.db.bots.update_one({'token': bot_data['token']}, {"$set": bot_data})
 
 
 class BotSettingsView(NavigationView):
