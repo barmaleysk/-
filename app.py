@@ -8,7 +8,7 @@ import pandas as pd
 from views import *
 import redis
 import json
-from utils import Listener
+from utils import Listener, VKListener
 
 
 class Convo(object):
@@ -217,10 +217,19 @@ class MarketBot(object):
         convo = self.get_convo(doc.chat.id)
         convo.process_file(doc)
 
+    def process_redis_update(self, data):
+        try:
+            update = data['data']
+            update = telebot.types.Update.de_json(update.encode('utf-8'))
+            self.bot.process_new_updates([update])
+        except Exception, e:
+            print e
+
     def start(self):
         self._init_bot()
         for convo_data in self.db.convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
+        Listener(self.process_redis_update, [self.token]).start()
         self.bot_manager.register_bot(self.bot)
 
 
@@ -239,6 +248,8 @@ class MasterBot(MarketBot):
 
     def start(self):
         super(MasterBot, self).start()
+        VKListener().start()
+        Listener(mb.process_vk_output, ['vk_output']).start()
 
         for bot_data in self.db.bots.find():
             try:

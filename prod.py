@@ -1,7 +1,7 @@
 import web
 from web.wsgiserver import CherryPyWSGIServer
 from app import MasterBot
-from utils import Singleton, VKListener, Listener
+from utils import Singleton
 import telebot
 import redis
 
@@ -45,14 +45,11 @@ class BotManager(Singleton):
 class hello:
     def POST(self):
         token = web.ctx.path.split('/')[1]
-        update = web.data()
-        r.publish('updates', token + DELIMETER + update)
+        r.publish(token, web.data())
         return ''
 
 if __name__ == "__main__":
     mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
     mb.start()
-    VKListener().start()
-    Listener(mb.process_vk_output, ['vk_output']).start()
-    Listener(BotManager().process_redis_update, ['updates']).start()
+    # Listener(BotManager().process_redis_update, ['updates']).start()
     app.run()
