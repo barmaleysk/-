@@ -701,6 +701,13 @@ class SelectBotOrdersView(NavigationView):
 class MenuCatView(InlineNavigationView):
     def __init__(self, ctx, msg=''):
         super(MenuCatView, self).__init__(ctx, msg=msg)
+        self.init_categories()
+
+    def activate(self):
+        self.init_categories()
+        super(MenuCatView, self).activate()
+
+    def init_categories(self):
         data = self.ctx.get_bot_data()['items']
         self.categories = defaultdict(list)
         for item_data in data:

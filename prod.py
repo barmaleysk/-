@@ -35,7 +35,7 @@ class BotManager(Singleton):
     def process_redis_update(self, data):
         try:
             data = data['data']
-            token, update = data.split()
+            token, update = data.split(DELIMETER)
             update = telebot.types.Update.de_json(update.encode('utf-8'))
             self.process_update(token, update)
         except Exception, e:
