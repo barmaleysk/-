@@ -10,9 +10,6 @@ WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
 WEBHOOK_SSL_CERT = CherryPyWSGIServer.ssl_certificate = '/home/ubuntu/webhook_cert.pem'
 WEBHOOK_SSL_PKEY = CherryPyWSGIServer.ssl_private_key = "/home/ubuntu/webhook_pkey.pem"
 
-urls = ("/.*", "hello")
-app = web.application(urls, globals())
-
 
 class WebHookBotManager(Singleton):
     bots = {}
@@ -31,7 +28,9 @@ class WebHookBotManager(Singleton):
             self.bots[token].process_new_updates([update])
         return ''
 
-bm = WebHookBotManager()
+
+urls = ("/.*", "hello")
+app = web.application(urls, globals())
 
 
 class hello:
@@ -39,10 +38,10 @@ class hello:
         token = web.ctx.path.split('/')[1]
         data = web.data()
         update = telebot.types.Update.de_json(data.encode('utf-8'))
-        bm.process_update(token, update)
+        WebHookBotManager().process_update(token, update)
         return '!'
 
 if __name__ == "__main__":
-    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"}, bm)
+    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"}, WebHookBotManager())
     mb.start()
     app.run()
