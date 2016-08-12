@@ -7,6 +7,7 @@ import pymongo
 from datetime import datetime
 from utils import Mailer, striphtml
 from collections import defaultdict
+from vk_crawler import Crawler
 
 
 class MarkupMixin(object):
@@ -343,16 +344,18 @@ class DetailsView(View):
                     self.next()
                 else:
                     self.ctx.send_message('Неверный формат')
-            # elif isinstance(self.current(), FileDetail):
-            #     if 'vk.com' in cmd:
-            #         try:
-            #             celf.ctx.tmpdata = Crawler(cmd).fetch()
-            #             if self.current().validate(self.ctx.tmpdata):
-            #                 self.current().value = self.ctx.tmpdata
-            #                 self.ctx.tmpdata = None
-            #                 self.next()
-            #         except:
-            #             self.ctx.send_message('Неверный формат магазина')
+            elif isinstance(self.current(), FileDetail):
+                if 'vk.com' in cmd:
+                    try:
+                        self.ctx.tmpdata = Crawler(cmd).fetch()
+                        print self.ctx.tmpdata
+                        if self.current().validate(self.ctx.tmpdata):
+                            self.current().value = self.ctx.tmpdata
+                            self.ctx.tmpdata = None
+                            self.next()
+                    except Exception, e:
+                        print e
+                        self.ctx.send_message('Неверный формат магазина')
 
 
 class BotCreatorView(DetailsView):
@@ -550,8 +553,8 @@ class MenuNode(View):
                 _id = str(cnt)
                 self.items[_id] = ItemNode(item, _id, self.ctx, self)
                 cnt += 1
-            except:
-                pass
+            except Exception, e:
+                print e
 
     # def activate(self):
     #     self.render()
@@ -666,7 +669,7 @@ class BotSettingsView(NavigationView):
             self.views[token] = UpdateBotView(self.ctx, [
                 TokenDetail('shop.token', name='API token', ctx=self.ctx, value=bot['token']),
                 EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
-                FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример)</a>'),
+                FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров или url магазина вконтакте', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример файла)</a>'),
                 TextDetail('shop.delivery_info', name='текст с условиями доставки', value=bot.get('delivery_info')),
                 TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info'))
             ], final_message='Магазин сохранен!')
@@ -701,7 +704,7 @@ class MenuCatView(InlineNavigationView):
         data = self.ctx.get_bot_data()['items']
         self.categories = defaultdict(list)
         for item_data in data:
-            self.categories[item_data['cat']].append(item_data)
+            self.categories[item_data['cat'].split('.')[0][:80]].append(item_data)  # TODO HACK
         if u'' in self.categories:
             del self.categories[u'']
         self.links = {cat: ['menu_cat_view', cat] for cat in self.categories.keys()}
@@ -720,6 +723,7 @@ class MenuCatView(InlineNavigationView):
 
     def render(self):
         self.ctx.send_message('Меню', markup=self.mk_markup(['Назад']))
+        print self.links.keys()
         super(MenuCatView, self).render()
 
 

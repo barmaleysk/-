@@ -6,7 +6,6 @@ from StringIO import StringIO
 from pymongo import MongoClient
 import pandas as pd
 from views import *
-from vk_crawler import Crawler
 
 
 class Convo(object):
@@ -35,8 +34,8 @@ class Convo(object):
                 self.log(msg1, data={'type': 'send_message', 'markup': markup.to_json()})
                 self.db.convos.update_one({'bot_token': self.bot.token, 'chat_id': self.chat_id}, {'$set': {'last_message_id': msg.message_id}})
                 return msg
-            except:
-                pass
+            except Exception, e:
+                print e
 
     def log(self, txt, data=None):
         self.db.logs.insert_one({'bot_token': self.bot.token, 'chat_id': self.chat_id, 'txt': txt, 'data': data})
@@ -115,7 +114,7 @@ class MainConvo(Convo):
         self.views['add_view'] = BotCreatorView(self, [
             TokenDetail('shop.token', name='API token.', desc='Для этого перейдите в @BotFather и нажмите /newbot для создания бота. Придумайте название бота (должно быть на русском языке) и ссылку на бот (на английском языке и заканчиваться на bot). Далее вы увидите API token, который нужно скопировать и отправить в этот чат.', ctx=self),
             EmailDetail('shop.email', name='email для приема заказов', ctx=self),
-            FileDetail('shop.items', name='файл с описанием товаров', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример</a>'),
+            FileDetail('shop.items', name='файл с описанием товаров или url магазина вконтакте', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример файла</a>'),
             TextDetail('shop.delivery_info', name='текст с условиями доставки'),
             TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + str(self.bot.bot.get_chat(self.chat_id).username))
         ], final_message='Магазин создан!')

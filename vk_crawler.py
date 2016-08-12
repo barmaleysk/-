@@ -46,7 +46,7 @@ class Crawler(Spider):
                 item_price = item_price * 1000 + int(item_price_2)
             item_attributes = {"id": item_id,
                                "native_id": item_native_id,
-                               "img_url": item_img,
+                               "img": item_img,
                                "price": item_price,
                                "name": "",
                                "cat": ""}
@@ -60,6 +60,7 @@ class Crawler(Spider):
             item_desc = d.find_element_by_id("market_item_description").text
             item_cat = d.find_element_by_class_name("market_item_category").text
             item_attributes['desc'] = item_desc
+            item_attributes['name'] = item_desc.split('.')[0][:80]  # TODO hack
             item_attributes['cat'] = item_cat
             self.data.append(item_attributes)
 
@@ -74,8 +75,8 @@ class Crawler(Spider):
 #         json.dump(data, f)
 #     return json.dumps(data)
 
-# def main():
-#     print Crawler('https://vk.com/spark.design').fetch()
+def main():
+    print Crawler('https://vk.com/spark.design').fetch()
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()

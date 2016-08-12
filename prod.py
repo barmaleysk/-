@@ -30,7 +30,7 @@ class BotManager(Singleton):
         return ''
 
 
-mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"}, BotManager())
+mb = MasterBot({'token': open('token').read()}, BotManager())
 mb.start()
 
 

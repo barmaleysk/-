@@ -12,7 +12,8 @@ class SimpleBotManager(Singleton):
         while True:
             for bot in self.bots:
                 upd = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
-                bot.process_new_updates(upd)
+                if len(upd) > 0:
+                    bot.process_new_updates(upd)
 
 
 if __name__ == "__main__":
