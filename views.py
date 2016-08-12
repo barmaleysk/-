@@ -7,7 +7,7 @@ import pymongo
 from datetime import datetime
 from utils import Mailer, striphtml
 from collections import defaultdict
-from vk_crawler import Crawler
+import json
 
 
 class MarkupMixin(object):
@@ -321,8 +321,11 @@ class DetailsView(View):
             self.render()
 
     def process_message(self, cmd):
+        print cmd, cmd == 'ОК'
         if cmd == 'ОК':
+            print self.ctx.tmpdata is not None
             if isinstance(self.current(), FileDetail) and self.ctx.tmpdata is not None:
+                print 'validation..'
                 if self.current().validate(self.ctx.tmpdata):
                     self.current().value = self.ctx.tmpdata
                     self.ctx.tmpdata = None
@@ -347,12 +350,9 @@ class DetailsView(View):
             elif isinstance(self.current(), FileDetail):
                 if 'vk.com' in cmd:
                     try:
-                        self.ctx.tmpdata = Crawler(cmd).fetch()
-                        print self.ctx.tmpdata
-                        if self.current().validate(self.ctx.tmpdata):
-                            self.current().value = self.ctx.tmpdata
-                            self.ctx.tmpdata = None
-                            self.next()
+                        self.ctx.redis.publish('vk_input', json.dumps({'token': self.ctx.token, 'chat_id': self.ctx.chat_id, 'url': cmd}))
+                        self.ctx.send_message('Анализирую..')
+                        self.ctx.tmpdata = None
                     except Exception, e:
                         print e
                         self.ctx.send_message('Неверный формат магазина')

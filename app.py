@@ -6,11 +6,15 @@ from StringIO import StringIO
 from pymongo import MongoClient
 import pandas as pd
 from views import *
+import redis
+import json
+from utils import Listener
 
 
 class Convo(object):
     def __init__(self, data, bot):
         self.bot = bot
+        self.redis = redis.Redis()
         self.token = bot.token
         self.db = bot.db
         self.chat_id = data['chat_id']
@@ -222,6 +226,16 @@ class MarketBot(object):
 
 class MasterBot(MarketBot):
     convo_type = MainConvo
+
+    def process_vk_output(self, data):
+        try:
+            data = json.loads(data['data'])
+            convo = self.get_convo(data['chat_id'])
+            convo.tmpdata = data['data']
+            print convo.get_current_view()
+            convo.get_current_view().process_message('ОК')
+        except Exception, e:
+            print e
 
     def start(self):
         super(MasterBot, self).start()

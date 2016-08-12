@@ -1,7 +1,7 @@
 import web
 from web.wsgiserver import CherryPyWSGIServer
 from app import MasterBot
-from utils import Singleton
+from utils import Singleton, VKListener, Listener
 import telebot
 
 CherryPyWSGIServer.ssl_certificate = "/home/ubuntu/webhook_cert.pem"
@@ -32,6 +32,8 @@ class BotManager(Singleton):
 
 mb = MasterBot({'token': open('token').read()}, BotManager())
 mb.start()
+VKListener().start()
+Listener(mb.process_vk_output, ['vk_output']).start()
 
 
 class hello:

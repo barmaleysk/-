@@ -4,6 +4,45 @@ import sendgrid
 import os
 from sendgrid.helpers.mail import *
 import re
+import threading
+from vk_crawler import Crawler
+import redis
+
+
+class Listener(threading.Thread):
+    def __init__(self, worker_func, channels, r=redis.Redis()):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.redis = r
+        self.worker_func = worker_func
+        self.pubsub = self.redis.pubsub()
+        self.pubsub.subscribe(channels)
+
+    def run(self):
+        for item in self.pubsub.listen():
+            if item['data'] == "KILL":
+                self.pubsub.unsubscribe()
+                print self, "unsubscribed and finished"
+                break
+            else:
+                self.worker_func(item)
+
+
+class VKListener(Listener):
+
+    def __init__(self):
+        super(VKListener, self).__init__(self.crawl, ['vk_input'])
+
+    def crawl(self, data):
+        print 'worker got data', data
+        try:
+            data = json.loads(data['data'])
+            url = data['url']
+            chat_id = data['chat_id']
+            res = Crawler(url).fetch()
+            self.redis.publish('vk_output', json.dumps({'chat_id': chat_id, 'data': res}))
+        except Exception, e:
+            print e
 
 
 class Singleton(object):

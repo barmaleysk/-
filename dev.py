@@ -1,5 +1,5 @@
 from app import MasterBot
-from utils import Singleton
+from utils import Singleton, VKListener, Listener
 
 
 class SimpleBotManager(Singleton):
@@ -19,4 +19,6 @@ class SimpleBotManager(Singleton):
 if __name__ == "__main__":
     mb = MasterBot({'token': open('token.dev').read()}, SimpleBotManager())  # test
     mb.start()
+    VKListener().start()
+    Listener(mb.process_vk_output, ['vk_output']).start()
     SimpleBotManager().run()
