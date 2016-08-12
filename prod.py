@@ -30,7 +30,7 @@ class BotManager(Singleton):
         return ''
 
 
-mb = MasterBot({'token': open('token').read()}, BotManager())
+mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
 mb.start()
 VKListener().start()
 Listener(mb.process_vk_output, ['vk_output']).start()
