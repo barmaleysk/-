@@ -220,8 +220,9 @@ class MarketBot(object):
     def process_redis_update(self, data):
         try:
             update = data['data']
-            update = telebot.types.Update.de_json(update.encode('utf-8'))
-            self.bot.process_new_updates([update])
+            if isinstance(data['data'], basestring):
+                update = telebot.types.Update.de_json(update.encode('utf-8'))
+                self.bot.process_new_updates([update])
         except Exception, e:
             print e
 
@@ -256,6 +257,5 @@ class MasterBot(MarketBot):
                 self.start_bot(bot_data)
             except Exception, e:
                 print e
-
         while True:
             pass

@@ -4,6 +4,8 @@ import redis
 from utils import Singleton
 import telebot
 from utils import Listener
+from multiprocessing import Process
+from app import MasterBot
 
 
 class WebhookRegister(Singleton):
@@ -20,7 +22,8 @@ class WebhookRegister(Singleton):
 
     def register_bot_by_redis(self, data):
         try:
-            self.set_webhook(data['data'])
+            if isinstance(data['data'], basestring):
+                self.set_webhook(data['data'])
         except Exception, e:
             print e
 
@@ -41,4 +44,5 @@ class hello:
 
 if __name__ == "__main__":
     Listener(WebhookRegister().register_bot_by_redis, ['bots']).start()
+    Process(target=MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}).start).start()
     app.run()
