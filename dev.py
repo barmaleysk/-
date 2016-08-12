@@ -1,4 +1,5 @@
-from app import MasterBot, Singleton
+from app import MasterBot
+from utils import Singleton
 
 
 class SimpleBotManager(Singleton):

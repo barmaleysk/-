@@ -1,6 +1,7 @@
 import web
 from web.wsgiserver import CherryPyWSGIServer
-from app import MasterBot, Singleton
+from app import MasterBot
+from utils import Singleton
 import telebot
 
 CherryPyWSGIServer.ssl_certificate = "/home/ubuntu/webhook_cert.pem"
