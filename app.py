@@ -4,13 +4,10 @@ import telebot
 from telebot import types
 from pyexcel_xls import get_data
 from StringIO import StringIO
-from validate_email import validate_email
 from collections import defaultdict
 from pymongo import MongoClient
 import pymongo
 import sendgrid
-from multiprocessing import Process
-from threading import Thread
 import os
 from sendgrid.helpers.mail import *
 from datetime import datetime
@@ -18,8 +15,6 @@ import pandas as pd
 import re
 from views import *
 from vk_crawler import Crawler
-import trollius
-import flask
 
 
 def striphtml(data):
@@ -701,47 +696,9 @@ class Singleton(object):
         return cls._instance
 
 
-class BotProcessor(Singleton):
-    queue = set()
-    updates = {}
-    loop = trollius.get_event_loop()
-
+class BotManagerBase(Singleton):
     def register_bot(self, bot):
-        self.loop.call_soon(self.get_updates, bot)
-
-    def get_updates(self, bot):
-        upd = bot.get_updates(offset=(bot.last_update_id + 1), timeout=0)
-        self.loop.call_soon(self.process_updates, bot, upd)
-
-    def process_updates(self, bot, upd):
-        bot.process_new_updates(self.updates[bot.token])
-
-    def run(self):
-        self.loop.run_forever()
-        loop.close()
-
-
-class WebhookProcessor(Singleton):
-    WEBHOOK_HOST = 'ec2-52-34-35-240.us-west-2.compute.amazonaws.com'
-    WEBHOOK_PORT = 8443  # 443, 80, 88 or 8443 (port need to be 'open')
-    WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
-    WEBHOOK_SSL_CERT = '/home/ubuntu/webhook_cert.pem'  # Path to the ssl certificate
-    WEBHOOK_SSL_PRIV = '/home/ubuntu/webhook_pkey.pem'  # Path to the ssl private key
-    WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-
-    app = flask.Flask(__name__)
-
-    def register_bot(self, bot):
-        self.app.add_url_rule('/' + bot.token, bot.token, bot.webhook_handler)
-        print 'registered bot at ' + self.WEBHOOK_URL_BASE + '/' + bot.bot.token + '/'
-        bot.bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.bot.token + '/')
-
-    def run(self):
-        self.app.run(
-            host=self.WEBHOOK_LISTEN,
-            port=self.WEBHOOK_PORT,
-            ssl_context=(self.WEBHOOK_SSL_CERT, self.WEBHOOK_SSL_PRIV),
-            debug=True)
+        pass
 
 
 class MarketBot(object):
@@ -807,10 +764,7 @@ class MasterBot(MarketBot):
     convo_type = MainConvo
 
     def start(self):
-        self._init_bot()
-        for convo_data in self.get_db().convos.find({'bot_token': self.token}):
-            self.init_convo(convo_data)
-        self.bot_manager.register_bot(self.bot)
+        super(MasterBot, self).start()
 
         for bot_data in self.get_db().bots.find():
             try:

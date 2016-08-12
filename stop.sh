@@ -1,3 +1,3 @@
 #!/bin/bash
-pkill -f "python app.py";
-pkill -f "/home/ubuntu/marketbot/app.py";
+pkill -f "python prod.py";
+pkill -f "/home/ubuntu/marketbot/prod.py";
