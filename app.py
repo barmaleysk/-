@@ -249,7 +249,7 @@ class MasterBot(MarketBot):
     def start(self):
         super(MasterBot, self).start()
         VKListener().start()
-        Listener(mb.process_vk_output, ['vk_output']).start()
+        Listener(self.process_vk_output, ['vk_output']).start()
 
         for bot_data in self.db.bots.find():
             try:
