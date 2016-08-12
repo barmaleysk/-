@@ -29,6 +29,8 @@ class BotManager(Singleton):
             self.bots[token].process_new_updates([update])
         return ''
 
+mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
+
 
 class hello:
     def POST(self):
@@ -40,7 +42,6 @@ class hello:
 
 if __name__ == "__main__":
     VKListener().start()
-    mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
     Listener(mb.process_vk_output, ['vk_output']).start()
     mb.start()
     app.run()
