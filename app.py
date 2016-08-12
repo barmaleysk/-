@@ -654,12 +654,7 @@ class MainConvo(Convo):
             self.route(['main_view'])
 
     def start_bot(self, bot_data):
-<<<<<<< HEAD
-        MarketBot(bot_data).start()
-=======
-        mb = MarketBot(bot_data)
-        WebhookProcessor().register_bot(mb.bot)
->>>>>>> master
+        MarketBot(bot_data, self.bot.bot_manager).start()
 
     def process_file(self, doc):
         # try:
@@ -704,8 +699,6 @@ class MainConvo(Convo):
         self.tmpdata = items
 
 
-<<<<<<< HEAD
-=======
 class Singleton(object):
     _instance = None
 
@@ -715,7 +708,6 @@ class Singleton(object):
         return cls._instance
 
 
->>>>>>> master
 class MarketBot(object):
     convo_type = MarketBotConvo
 
@@ -730,7 +722,6 @@ class MarketBot(object):
     def get_db(self):
         self.db = self.db or MongoClient('localhost', 27017, connect=False)
         return self.db['marketbot']
-        print(self.db['marketbot'])
 
     def _init_bot(self, threaded=False):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
@@ -752,7 +743,7 @@ class MarketBot(object):
 
     def goto_main(self, message):
         convo = self.get_convo(message.chat.id)
-        convo.route('main_view')
+        convo.route(['main_view'])
 
     def process_callback(self, callback):
         # print callback.message.chat.id
