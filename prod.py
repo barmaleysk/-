@@ -26,9 +26,12 @@ class WebHookBotManager(Singleton):
         print self.bots
 
     def process_update(self, token, update):
+        print self.bots
         if token in self.bots:
             self.bots[token].process_new_updates([update])
         return ''
+
+bm = WebHookBotManager()
 
 
 class hello:
@@ -36,10 +39,10 @@ class hello:
         token = web.ctx.path.split('/')[1]
         data = web.data()
         update = telebot.types.Update.de_json(data.encode('utf-8'))
-        WebHookBotManager().process_update(token, update)
+        bm.process_update(token, update)
         return '!'
 
 if __name__ == "__main__":
-    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"}, WebHookBotManager())
+    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"}, bm)
     mb.start()
     app.run()
