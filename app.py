@@ -4,13 +4,10 @@ import telebot
 from telebot import types
 from pyexcel_xls import get_data
 from StringIO import StringIO
-from validate_email import validate_email
 from collections import defaultdict
 from pymongo import MongoClient
 import pymongo
 import sendgrid
-from multiprocessing import Process
-from threading import Thread
 import os
 from sendgrid.helpers.mail import *
 from datetime import datetime
@@ -657,7 +654,12 @@ class MainConvo(Convo):
             self.route(['main_view'])
 
     def start_bot(self, bot_data):
+<<<<<<< HEAD
         MarketBot(bot_data).start()
+=======
+        mb = MarketBot(bot_data)
+        WebhookProcessor().register_bot(mb.bot)
+>>>>>>> master
 
     def process_file(self, doc):
         # try:
@@ -702,15 +704,28 @@ class MainConvo(Convo):
         self.tmpdata = items
 
 
+<<<<<<< HEAD
+=======
+class Singleton(object):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Singleton, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
+
+>>>>>>> master
 class MarketBot(object):
     convo_type = MarketBotConvo
 
-    def __init__(self, data):
+    def __init__(self, data, bot_manager):
         self.token = data['token']
         self.data = data
         self.convos = {}
         self.db = None
         self.email = data.get('email')
+        self.bot_manager = bot_manager
 
     def get_db(self):
         self.db = self.db or MongoClient('localhost', 27017, connect=False)
@@ -761,22 +776,30 @@ class MarketBot(object):
         self._init_bot()
         for convo_data in self.get_db().convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        Process(target=self.bot.polling).start()
+        self.bot_manager.register_bot(self.bot)
 
 
 class MasterBot(MarketBot):
     convo_type = MainConvo
 
     def start(self):
-        self._init_bot()
-        for convo_data in self.get_db().convos.find({'bot_token': self.token}):
-            self.init_convo(convo_data)
+        super(MasterBot, self).start()
+
         for bot_data in self.get_db().bots.find():
-            m = MarketBot(bot_data)
-            m.start()
-        Process(target=self.bot.polling).start()
+            try:
+                m = MarketBot(bot_data, self.bot_manager)
+                m.start()
+            except Exception, e:
+                print e
+
+    # def route(self, token):
+    #     if token == self.bot.token:
+    #         return self.bot
+    #     elif token in self.__bots:
+    #         return self.__bots[token].bot
 
 
-if __name__ == "__main__":
-    mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
-    mb.start()
+# if __name__ == "__main__":
+#     mb = MasterBot({'token': "203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw"})  # prod
+#     mb.start()
+#     WebhookProcessor().run()
