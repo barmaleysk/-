@@ -14,7 +14,7 @@ from utils import Listener, VKListener
 class Convo(object):
     def __init__(self, data, bot):
         self.bot = bot
-        self.redis = redis.Redis()
+        self.redis = bot.redis
         self.token = bot.token
         self.db = bot.db
         self.chat_id = data['chat_id']
@@ -172,13 +172,13 @@ class MainConvo(Convo):
 class MarketBot(object):
     convo_type = MarketBotConvo
 
-    def __init__(self, data, bot_manager, db=MongoClient('localhost', 27017, connect=False)['marketbot']):
+    def __init__(self, data, db=MongoClient('localhost', 27017, connect=False)['marketbot']):
         self.token = data['token']
         self.data = data
         self.convos = {}
         self.db = db
         self.email = data.get('email')
-        self.bot_manager = bot_manager
+        self.redis = redis.Redis()
 
     def _init_bot(self, threaded=False):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
@@ -199,7 +199,7 @@ class MarketBot(object):
         return self.convos[chat_id]
 
     def start_bot(self, bot_data):
-        MarketBot(bot_data, self.bot_manager, self.db).start()
+        MarketBot(bot_data, self.db).start()
 
     def goto_main(self, message):
         convo = self.get_convo(message.chat.id)
@@ -229,8 +229,8 @@ class MarketBot(object):
         self._init_bot()
         for convo_data in self.db.convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
+        self.redis.publish('bots', self.token)
         Listener(self.process_redis_update, [self.token]).start()
-        self.bot_manager.register_bot(self.bot)
 
 
 class MasterBot(MarketBot):
