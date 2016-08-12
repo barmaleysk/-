@@ -10,22 +10,22 @@ WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
 WEBHOOK_SSL_CERT = CherryPyWSGIServer.ssl_certificate = '/home/ubuntu/webhook_cert.pem'
 WEBHOOK_SSL_PKEY = CherryPyWSGIServer.ssl_private_key = "/home/ubuntu/webhook_pkey.pem"
 
+bots = {}
+
 
 class WebHookBotManager(Singleton):
-    bots = {}
 
     def register_bot(self, bot):
         bot.remove_webhook()
         webhook_url = WEBHOOK_URL_BASE + '/' + bot.token + '/'
         print 'registered bot at', webhook_url
         bot.set_webhook(url=webhook_url, certificate=open('/home/ubuntu/webhook_cert.pem', 'r'))
-        self.bots[bot.token] = bot
-        print self.bots
+        bots[bot.token] = bot
 
     def process_update(self, token, update):
-        print self.bots
-        if token in self.bots:
-            self.bots[token].process_new_updates([update])
+        print bots
+        if token in bots:
+            bots[token].process_new_updates([update])
         return ''
 
 
