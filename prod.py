@@ -21,8 +21,9 @@ class WebHookBotManager(Singleton):
         bot.remove_webhook()
         webhook_url = WEBHOOK_URL_BASE + '/' + bot.token + '/'
         print 'registered bot at', webhook_url
-        bot.set_webhook(url=webhook_url, certificate=open(WEBHOOK_SSL_CERT, 'r'))
+        bot.set_webhook(url=webhook_url, certificate=open('/home/ubuntu/webhook_cert.pem', 'r'))
         self.bots[bot.token] = bot
+        print self.bots
 
     def process_update(self, token, update):
         if token in self.bots:
