@@ -15,6 +15,6 @@ class SimpleBotManager(Singleton):
 
 
 if __name__ == "__main__":
-    mb = MasterBot({'token': open('token.dev').read()}, SimpleBotManager())  # test
+    mb = MasterBot({'token': open('token.dev').read().strip()}, SimpleBotManager())  # test
     mb.start()
     SimpleBotManager().run()
