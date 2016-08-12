@@ -3,12 +3,15 @@ from web.wsgiserver import CherryPyWSGIServer
 from app import MasterBot
 from utils import Singleton, VKListener, Listener
 import telebot
+import redis
 
 CherryPyWSGIServer.ssl_certificate = "/home/ubuntu/webhook_cert.pem"
 CherryPyWSGIServer.ssl_private_key = "/home/ubuntu/webhook_pkey.pem"
 
 urls = ("/.*", "hello")
 app = web.application(urls, globals())
+r = redis.Redis()
+DELIMETER = '::::$$$$$$:::'
 
 
 class BotManager(Singleton):
@@ -29,19 +32,27 @@ class BotManager(Singleton):
             self.bots[token].process_new_updates([update])
         return ''
 
-mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
-mb.start()
+    def process_redis_update(self, data):
+        try:
+            data = data['data']
+            token, update = data.split()
+            update = telebot.types.Update.de_json(update.encode('utf-8'))
+            self.process_update(token, update)
+        except Exception, e:
+            print e
 
 
 class hello:
     def POST(self):
         token = web.ctx.path.split('/')[1]
-        data = web.data()
-        update = telebot.types.Update.de_json(data.encode('utf-8'))
-        BotManager().process_update(token, update)
-        return '!'
+        update = web.data()
+        r.publish('updates', token + DELIMETER + update)
+        return ''
 
 if __name__ == "__main__":
+    mb = MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}, BotManager())
+    mb.start()
     VKListener().start()
     Listener(mb.process_vk_output, ['vk_output']).start()
+    Listener(BotManager().process_redis_update, ['updates']).start()
     app.run()
