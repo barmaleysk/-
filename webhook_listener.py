@@ -43,3 +43,5 @@ class hello:
 if __name__ == "__main__":
     Listener(WebhookRegister().register_bot_by_redis, ['bots']).start()
     app.run()
+    while True:
+        pass
