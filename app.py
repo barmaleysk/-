@@ -8,6 +8,7 @@ import pandas as pd
 from views import *
 import redis
 import json
+import threading
 from utils import Listener, VKListener
 
 
@@ -169,10 +170,11 @@ class MainConvo(Convo):
         self.tmpdata = items
 
 
-class MarketBot(object):
+class MarketBot(threading.Thread):
     convo_type = MarketBotConvo
 
-    def __init__(self, data, db=MongoClient('localhost', 27017, connect=False)['marketbot']):
+    def __init__(self, data, db=MongoClient('localhost', 27017, connect=False)['marketbot'], daemonize=True):
+        threading.Thread.__init__(self)
         self.token = data['token']
         self.data = data
         self.convos = {}
@@ -180,6 +182,13 @@ class MarketBot(object):
         self.email = data.get('email')
         self.redis = redis.Redis()
         self.last_update_id = 0
+        self.pubsub = self.redis.pubsub()
+        self.pubsub.subscribe([self.token])
+        self.redis.publish('bots', self.token)
+        self.daemon = daemonize
+        self._init_bot()
+        for convo_data in self.db.convos.find({'bot_token': self.token}):
+            self.init_convo(convo_data)
 
     def _init_bot(self, threaded=False):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
@@ -229,12 +238,9 @@ class MarketBot(object):
         except Exception, e:
             print e
 
-    def start(self):
-        self._init_bot()
-        for convo_data in self.db.convos.find({'bot_token': self.token}):
-            self.init_convo(convo_data)
-        self.redis.publish('bots', self.token)
-        Listener(self.process_redis_update, [self.token]).start()
+    def run(self):
+        for item in self.pubsub.listen():
+            self.process_redis_update(item)
 
 
 class MasterBot(MarketBot):
@@ -250,15 +256,12 @@ class MasterBot(MarketBot):
         except Exception, e:
             print e
 
-    def start(self):
-        super(MasterBot, self).start()
+    def run(self):
         VKListener().start()
-        ll = Listener(self.process_vk_output, ['vk_output'])  # TODO
-        ll.daemon = False
-        ll.start()
-
+        Listener(self.process_vk_output, ['vk_output']).start()
         for bot_data in self.db.bots.find():
             try:
                 self.start_bot(bot_data)
             except Exception, e:
                 print e
+        super(MasterBot, self).run()
