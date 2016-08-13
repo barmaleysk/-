@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import telebot
+from telebot import apihelper
 from pyexcel_xls import get_data
 from StringIO import StringIO
 from pymongo import MongoClient
@@ -36,7 +37,7 @@ class Convo(object):
             msg1 = msg.replace('<br />', '.\n')
             try:
                 msg = self.bot.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
-                self.log(msg1, data={'type': 'send_message', 'markup': markup.to_json()})
+                # self.log(msg1, data={'type': 'send_message', 'markup': markup.to_json()})
                 self.db.convos.update_one({'bot_token': self.bot.token, 'chat_id': self.chat_id}, {'$set': {'last_message_id': msg.message_id}})
                 return msg
             except Exception, e:
@@ -180,7 +181,9 @@ class MarketBot(object):
         self.token = data['token']
         self.data = data
         self.convos = {}
+        self.data.update(apihelper.get_me(self.token))
         self.db = db
+        self.db.bots.update_one({'token': self.token}, {'$set': self.data})
         self.email = data.get('email')
         self.redis = redis.Redis()
         self.last_update_id = data.get('last_update_id') or 0

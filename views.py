@@ -679,8 +679,7 @@ class BotSettingsView(NavigationView):
         self.links = {}
         self.views = {}
         for bot in self.ctx.db.bots.find({'chat_id': self.ctx.chat_id}):
-            name = '@' + telebot.TeleBot(bot['token']).get_me().first_name
-            self.links[name] = ['settings_view', bot['token']]
+            self.links[bot['username']] = ['settings_view', bot['token']]
         self.links['Главное меню'] = ['main_view']
         super(BotSettingsView, self).activate()
 
@@ -694,7 +693,7 @@ class SelectBotOrdersView(NavigationView):
     def activate(self):
         self.views = {}
         bots = self.ctx.db.bots.find({'chat_id': self.ctx.chat_id})
-        self.links = {telebot.TeleBot(bot['token']).get_me().first_name: ['select_bot_orders_view', bot['token']] for bot in bots}
+        self.links = {bot['username']: ['select_bot_orders_view', bot['token']] for bot in bots}
         super(SelectBotOrdersView, self).activate()
 
 
