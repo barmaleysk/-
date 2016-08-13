@@ -183,7 +183,7 @@ class MarketBot(object):
         self.db = db
         self.email = data.get('email')
         self.redis = redis.Redis()
-        self.last_update_id = 0
+        self.last_update_id = data.get('last_update_id') or 0
         self._init_bot()
         for convo_data in self.db.convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
@@ -220,6 +220,9 @@ class MarketBot(object):
         convo = self.get_convo(message.chat.id)
         convo.process_message(message)
 
+    def start_bot(self, bot_data):
+        MarketBot(bot_data, self.db)
+
     def process_file(self, doc):
         convo = self.get_convo(doc.chat.id)
         convo.process_file(doc)
@@ -230,6 +233,7 @@ class MarketBot(object):
                 update = telebot.types.Update.de_json(update.encode('utf-8'))
                 if update.update_id > self.last_update_id:
                     self.last_update_id = update.update_id
+                    self.db.bots.update_one({'token': self.token, '$set': {'last_update_id': self.last_update_id}})
                     self.bot.process_new_updates([update])
         except Exception, e:
             print e
@@ -243,7 +247,6 @@ class MasterBot(MarketBot):
             data = json.loads(data['data'])
             convo = self.get_convo(data['chat_id'])
             convo.tmpdata = data['data']
-            print convo.get_current_view()
             convo.get_current_view().process_message('ОК')
         except Exception, e:
             print e
@@ -259,11 +262,9 @@ class MasterBot(MarketBot):
         self.pubsub = self.redis.pubsub()
         self.pubsub.subscribe(['updates'])
         for item in self.pubsub.listen():
-            print item
             try:
                 data = item['data']
                 token, data = data.split('$$$$$')
-                print data, token, bots
                 if token in bots:
                     bots[token].process_redis_update(data)
             except:
