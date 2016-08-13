@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import gevent
-from gevent import monkey; monkey.patch_all(httplib=True)
+from gevent import monkey; monkey.patch_all()
 import telebot
 from telebot import apihelper
 from pyexcel_xls import get_data
@@ -260,7 +260,7 @@ class MasterBot(MarketBot):
             print e
 
     def __init__(self, data):
-        super(MasterBot, self).init(data)
+        super(MasterBot, self).__init__(data)
 
         for bot_data in self.db.bots.find():
             if bot_data['token'] != self.token:

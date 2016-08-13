@@ -1,5 +1,5 @@
 import gevent
-from gevent import monkey; monkey.patch_all(httplib=True)
+from gevent import monkey; monkey.patch_all()
 import web
 from web.wsgiserver import CherryPyWSGIServer
 import redis
