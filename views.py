@@ -73,11 +73,8 @@ class View(MarkupMixin):
         return None
 
     def render(self):
-        if not self.editable:
+        if not (self.editable and self.message_id):
             self.ctx.send_message(self.get_msg(), self.get_markup())
-        elif not self.message_id:
-            msg = self.ctx.send_message(self.get_msg(), self.get_markup())
-            self.message_id = msg.message_id
         else:
             self.ctx.edit_message(self.message_id, self.get_msg(), self.get_markup())
 
@@ -104,6 +101,7 @@ class InlineNavigationView(NavigationView):
 
     def process_callback(self, callback):
         cmd = callback.data
+        self.message_id = callback.message.message_id
         self.process_message(cmd)
 
 
@@ -138,7 +136,10 @@ class OrderView(View):
             markup.row(self.btn(u'Перенести в обработку', str(self.data['number']) + ':reactivate'))
         return markup
 
-    def process_callback(self, action):
+    def process_callback(self, callback):
+        action = callback.data.split(':')[1]
+        self.message_id = callback.message.message_id
+
         if action == 'complete':
             self.ctx.db.orders.update_one({'_id': self.data['_id']}, {'$set': {'status': 'Завершен'}})
             self.data = self.ctx.db.orders.find_one({'_id': self.data['_id']})
@@ -182,7 +183,7 @@ class AdminOrderView(View):
     def process_callback(self, callback):
         data = callback.data.encode('utf-8')
         number, action = data.split(':')
-        self._orders[number].process_callback(action)
+        self._orders[number].process_callback(callback)
 
 
 class Detail(object):
@@ -321,11 +322,8 @@ class DetailsView(View):
             self.render()
 
     def process_message(self, cmd):
-        print cmd, cmd == 'ОК'
         if cmd == 'ОК':
-            print self.ctx.tmpdata is not None
             if isinstance(self.current(), FileDetail) and self.ctx.tmpdata is not None:
-                print 'validation..'
                 if self.current().validate(self.ctx.tmpdata):
                     self.current().value = self.ctx.tmpdata
                     self.ctx.tmpdata = None
@@ -354,7 +352,6 @@ class DetailsView(View):
                         self.ctx.send_message('Анализирую..')
                         self.ctx.tmpdata = None
                     except Exception, e:
-                        print e
                         self.ctx.send_message('Неверный формат магазина')
 
 
@@ -432,12 +429,12 @@ class ItemNode(View):
         return (u'<a href="' + self.img + u'">' + self.name + u'</a>\n' + striphtml(self.description))[:500]
 
     def process_callback(self, call):
+        self.message_id = call.message.message_id
         _id, action = call.data.split(':')[1:]
         if action == 'add':
             self.count += 1
             self.render()
         if action == 'basket':
-            # print 'got to basket'
             self.ordered = True
             self.menu.goto_basket(call)
 
@@ -510,8 +507,8 @@ class BasketNode(View):
             return 'В Корзине пусто'
 
     def process_callback(self, call):
+        self.message_id = call.message.message_id
         action = call.data.split(':')[-1]
-        # print action
         if action == '>':
             self.inc()
         elif action == '<':
@@ -556,10 +553,6 @@ class MenuNode(View):
             except Exception:
                 pass
 
-    # def activate(self):
-    #     self.render()
-    #     super(MenuNode, self).activate()
-
     def render(self):
         super(MenuNode, self).render()
         self.render_5()
@@ -568,8 +561,8 @@ class MenuNode(View):
         for item in self.items.values()[self.ptr:self.ptr + 5]:
             try:
                 item.render()
-            except Exception, e:
-                print e
+            except Exception:
+                pass
         self.ptr += 5
 
     def process_message(self, message):
@@ -589,6 +582,7 @@ class MenuNode(View):
             return self.mk_markup(['Назад'])
 
     def process_callback(self, call):  # route callback to item node
+        self.message_id = call.message.message_id
         data = call.data.encode('utf-8')
         _type = data.split(':')[0]
         if _type == 'menu_item':
@@ -729,7 +723,6 @@ class MenuCatView(InlineNavigationView):
 
     def render(self):
         self.ctx.send_message('Меню', markup=self.mk_markup(['Назад']))
-        print self.links.keys()
         super(MenuCatView, self).render()
 
 

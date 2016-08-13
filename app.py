@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from gevent import monkey; monkey.patch_socket()
 import gevent
+from gevent import monkey; monkey.patch_all()
 import telebot
 from telebot import apihelper
 from pyexcel_xls import get_data
@@ -10,6 +10,7 @@ import pandas as pd
 from views import *
 import redis
 import json
+from gevent.server import StreamServer
 # from utils import Listener, VKListener, Singleton
 
 
@@ -35,18 +36,15 @@ class Convo(object):
     def send_message(self, msg, markup=None):
         if self.chat_id:
             msg1 = msg.replace('<br />', '.\n')
-            try:
-                return self.bot.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
-            except Exception, e:
-                print e
+            gevent.spawn(apihelper.send_message, self.token, self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
+            return
+            # gevent.spawn(self.bot.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
 
     def edit_message(self, message_id, msg, markup=None):
         if self.chat_id:
-            try:
-                msg1 = msg.replace('<br />', '.\n')
-                return self.bot.bot.edit_message_text(msg1, chat_id=self.chat_id, message_id=message_id, reply_markup=markup, parse_mode='HTML')
-            except:
-                pass
+            msg1 = msg.replace('<br />', '.\n')
+            gevent.spawn(apihelper.edit_message_text, self.token, msg1, self.chat_id, message_id=message_id, reply_markup=markup, parse_mode='HTML')
+            return
 
     def process_message(self, message):
         try:
@@ -67,7 +65,7 @@ class Convo(object):
 
     def set_path(self, path):
         self.path = path
-        self.db.convos.update_one({'bot_token': self.bot.token, 'chat_id': self.chat_id}, {'$set': {'path': path}})
+        gevent.spawn(self.db.convos.update_one, {'bot_token': self.bot.token, 'chat_id': self.chat_id}, {'$set': {'path': path}})
 
     def route(self, path):
         self.set_path(path)
@@ -223,15 +221,12 @@ class MarketBot(object):
         self.db.bots.update_one({'token': self.token}, {'$set': {'last_update_id': self.last_update_id}})
 
     def process_redis_update(self, update):
-        try:
-            if isinstance(update, basestring):
-                update = telebot.types.Update.de_json(update.encode('utf-8'))
-                if update.update_id > self.last_update_id:
-                    self.last_update_id = update.update_id
-                    gevent.spawn(self.bot.process_new_updates, [update])
-                    gevent.spawn(self.update_last_id)
-        except Exception, e:
-            print e
+        if isinstance(update, basestring):
+            update = telebot.types.Update.de_json(update.encode('utf-8'))
+            if update.update_id > self.last_update_id:
+                self.last_update_id = update.update_id
+                gevent.spawn(self.bot.process_new_updates, [update])
+                gevent.spawn(self.update_last_id)
 
 
 class MasterBot(MarketBot):
@@ -247,8 +242,8 @@ class MasterBot(MarketBot):
             print e
 
     def run(self):
-        VKListener().start()
-        Listener(self.process_vk_output, ['vk_output']).start()
+        # VKListener().start()
+        # Listener(self.process_vk_output, ['vk_output']).start()
         for bot_data in self.db.bots.find():
             if bot_data['token'] != self.token:
                 try:
@@ -264,3 +259,7 @@ class MasterBot(MarketBot):
                 if token in bots:
                     b = bots[token]
                     gevent.spawn(b.process_redis_update, data)
+
+if __name__ == "__main__":
+    m = MasterBot({'token': open('token').read().replace('\n', '')})
+    gevent.spawn(m.run).join()
