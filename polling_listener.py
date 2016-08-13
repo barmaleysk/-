@@ -16,6 +16,7 @@ class PollingProcessor(Singleton):
         print data
         if isinstance(data['data'], basestring):
             self.tokens[data['data']] = 0
+            telebot.TeleBot(data['data']).remove_webhook()
 
     def get_updates(self, silent=False):
         tokens = copy.copy(self.tokens)
@@ -28,6 +29,7 @@ class PollingProcessor(Singleton):
                     res = True
                     if not silent:
                         print silent
+                        print update
                         self.r.publish('updates', token + '$$$$$' + json.dumps(update))
         return res
 

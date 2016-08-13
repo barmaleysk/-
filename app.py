@@ -240,6 +240,9 @@ class MarketBot(object):
             print e
 
 
+from time import time
+
+
 class MasterBot(MarketBot):
     convo_type = MainConvo
 
@@ -264,8 +267,13 @@ class MasterBot(MarketBot):
         self.pubsub = self.redis.pubsub()
         self.pubsub.subscribe(['updates'])
         for item in self.pubsub.listen():
+            t0 = time()
             data = item['data']
             if isinstance(data, basestring):
                 token, data = data.split('$$$$$')
                 if token in bots:
-                    bots[token].process_redis_update(data)
+                    b = bots[token]
+                    t1 = time()
+                    print 't0', t1 - t0
+                    b.process_redis_update(data)
+                    print 't1', time() - t1
