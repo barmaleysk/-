@@ -182,7 +182,8 @@ class MarketBot(object):
         self.data = data
         self.convos = {}
         self.db = db
-        self.db.bots.update_one({'token': self.token}, {'$set': apihelper.get_me(self.token)})
+        if not self.db.bots.update_one({'token': self.token}, {'$set': apihelper.get_me(self.token)}):
+            self.db.bots.insert_one({'token': self.token})
         self.email = data.get('email')
         self.redis = redis.Redis()
         self.last_update_id = data.get('last_update_id') or 0
@@ -257,10 +258,11 @@ class MasterBot(MarketBot):
         VKListener().start()
         Listener(self.process_vk_output, ['vk_output']).start()
         for bot_data in self.db.bots.find():
-            try:
-                MarketBot(bot_data, self.db)
-            except Exception, e:
-                print e
+            if bot_data['token'] != self.token:
+                try:
+                    MarketBot(bot_data, self.db)
+                except Exception, e:
+                    print e
         self.pubsub = self.redis.pubsub()
         self.pubsub.subscribe(['updates'])
         for item in self.pubsub.listen():
