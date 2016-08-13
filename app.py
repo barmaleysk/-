@@ -200,7 +200,6 @@ class MarketBot(object):
         self.bot.add_message_handler(self.process_message, func=lambda message: True, content_types=['text', 'contact'])
 
     def init_convo(self, convo_data):
-        convo_data = dict(self.data.items() + convo_data.items())
         self.convos[convo_data['chat_id']] = self.convo_type(convo_data, self)
 
     def get_convo(self, chat_id):
