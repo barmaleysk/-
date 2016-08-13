@@ -15,8 +15,11 @@ class PollingProcessor(Singleton):
     def register_token(self, data):
         print data
         if isinstance(data['data'], basestring):
-            self.tokens[data['data']] = 0
-            telebot.TeleBot(data['data']).remove_webhook()
+            try:
+                telebot.TeleBot(data['data']).remove_webhook()
+                self.tokens[data['data']] = 0
+            except:
+                pass
 
     def get_updates(self, silent=False):
         tokens = copy.copy(self.tokens)
