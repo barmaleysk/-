@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-from gevent import monkey
-monkey.patch_socket()
-
+from gevent import monkey; monkey.patch_socket()
+import gevent
 import telebot
 from telebot import apihelper
 from pyexcel_xls import get_data
@@ -11,7 +10,6 @@ import pandas as pd
 from views import *
 import redis
 import json
-import threading
 from utils import Listener, VKListener, Singleton
 
 
@@ -242,9 +240,6 @@ class MarketBot(object):
             print e
 
 
-from time import time
-
-
 class MasterBot(MarketBot):
     convo_type = MainConvo
 
@@ -269,13 +264,9 @@ class MasterBot(MarketBot):
         self.pubsub = self.redis.pubsub()
         self.pubsub.subscribe(['updates'])
         for item in self.pubsub.listen():
-            t0 = time()
             data = item['data']
             if isinstance(data, basestring):
                 token, data = data.split('$$$$$')
                 if token in bots:
                     b = bots[token]
-                    t1 = time()
-                    print 't0', t1 - t0
-                    b.process_redis_update(data)
-                    print 't1', time() - t1
+                    gevent.spawn(b.process_redis_update, data)
