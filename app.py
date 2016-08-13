@@ -182,7 +182,6 @@ class MarketBot(object):
         self.data = data
         self.convos = {}
         self.db = db
-        self.data.update(me)
         self.db.bots.update_one({'token': self.token}, {'$set': apihelper.get_me(self.token)})
         self.email = data.get('email')
         self.redis = redis.Redis()
