@@ -43,6 +43,7 @@ class hello:
         if token in WebhookRegister().update_ids:
             update = web.data()
             update_id = json.loads(update)['update_id']
+            print update_id
             if update_id > WebhookRegister().update_ids[token]:
                 WebhookRegister().update_ids[token] = update_id
                 r.publish(token, update)
