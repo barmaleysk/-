@@ -262,10 +262,8 @@ class MasterBot(MarketBot):
         self.pubsub = self.redis.pubsub()
         self.pubsub.subscribe(['updates'])
         for item in self.pubsub.listen():
-            try:
-                data = item['data']
+            data = item['data']
+            if isinstance(data, basestring):
                 token, data = data.split('$$$$$')
                 if token in bots:
                     bots[token].process_redis_update(data)
-            except:
-                pass

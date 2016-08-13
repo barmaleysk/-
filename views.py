@@ -553,8 +553,8 @@ class MenuNode(View):
                 _id = str(cnt)
                 self.items[_id] = ItemNode(item, _id, self.ctx, self)
                 cnt += 1
-            except Exception, e:
-                print e
+            except Exception:
+                pass
 
     # def activate(self):
     #     self.render()
