@@ -28,7 +28,7 @@ class PollingProcessor(Singleton):
                     res = True
                     if not silent:
                         print silent
-                        self.r.publish(token, json.dumps(update))
+                        self.r.publish('updates', token + '$$$$$' + json.dumps(update))
         return res
 
     def start(self):
@@ -40,5 +40,4 @@ class PollingProcessor(Singleton):
 
 
 if __name__ == "__main__":
-    Process(target=MasterBot({'token': open('token').read()}).start).start()
     PollingProcessor().start()

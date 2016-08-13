@@ -224,10 +224,9 @@ class MarketBot(object):
         convo = self.get_convo(doc.chat.id)
         convo.process_file(doc)
 
-    def process_redis_update(self, data):
+    def process_redis_update(self, update):
         try:
-            update = data['data']
-            if isinstance(data['data'], basestring):
+            if isinstance(update, basestring):
                 update = telebot.types.Update.de_json(update.encode('utf-8'))
                 if update.update_id > self.last_update_id:
                     self.last_update_id = update.update_id
@@ -260,6 +259,7 @@ class MasterBot(MarketBot):
         self.pubsub = self.redis.pubsub()
         self.pubsub.subscribe(['updates'])
         for item in self.pubsub.listen():
+            print item
             try:
                 data = item['data']
                 token, data = data.split('$$$$$')
