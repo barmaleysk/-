@@ -9,7 +9,7 @@ from views import *
 import redis
 import json
 import threading
-from utils import Listener, VKListener
+from utils import Listener, VKListener, Singleton
 
 
 class Convo(object):
@@ -170,10 +170,13 @@ class MainConvo(Convo):
         self.tmpdata = items
 
 
-class MarketBot(threading.Thread):
+bots = {}
+
+
+class MarketBot():
     convo_type = MarketBotConvo
 
-    def __init__(self, data, db=MongoClient('localhost', 27017, connect=False)['marketbot'], daemonize=True):
+    def __init__(self, data, db=MongoClient('localhost', 27017, connect=False)['marketbot']):
         threading.Thread.__init__(self)
         self.token = data['token']
         self.data = data
@@ -182,13 +185,11 @@ class MarketBot(threading.Thread):
         self.email = data.get('email')
         self.redis = redis.Redis()
         self.last_update_id = 0
-        self.pubsub = self.redis.pubsub()
-        self.pubsub.subscribe([self.token])
-        self.redis.publish('bots', self.token)
-        self.daemon = daemonize
         self._init_bot()
         for convo_data in self.db.convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
+        bots[self.token] = self
+        self.redis.publish('bots', self.token)
 
     def _init_bot(self, threaded=False):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
@@ -207,9 +208,6 @@ class MarketBot(threading.Thread):
             self.db.convos.insert_one(convo_data)
             self.init_convo(convo_data)
         return self.convos[chat_id]
-
-    def start_bot(self, bot_data):
-        MarketBot(bot_data, self.db).start()
 
     def goto_main(self, message):
         convo = self.get_convo(message.chat.id)
@@ -238,10 +236,6 @@ class MarketBot(threading.Thread):
         except Exception, e:
             print e
 
-    def run(self):
-        for item in self.pubsub.listen():
-            self.process_redis_update(item)
-
 
 class MasterBot(MarketBot):
     convo_type = MainConvo
@@ -261,7 +255,16 @@ class MasterBot(MarketBot):
         Listener(self.process_vk_output, ['vk_output']).start()
         for bot_data in self.db.bots.find():
             try:
-                self.start_bot(bot_data)
+                MarketBot(bot_data, self.db)
             except Exception, e:
                 print e
-        super(MasterBot, self).run()
+        self.pubsub = self.redis.pubsub()
+        self.pubsub.subscribe(['updates'])
+        for item in self.pubsub.listen():
+            try:
+                data = item['data']
+                token, data = data.split('$$$$$')
+                if token in bots:
+                    bots[token].process_redis_update(data)
+            except:
+                pass

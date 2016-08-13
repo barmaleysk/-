@@ -36,7 +36,7 @@ r = redis.Redis()
 class hello:
     def POST(self):
         token = web.ctx.path.split('/')[1]
-        r.publish(token, web.data())
+        r.publish('updates', token + '$$$$$' + web.data())
         return 'ok'
 
 if __name__ == "__main__":
