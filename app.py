@@ -10,7 +10,7 @@ import pandas as pd
 from views import *
 import redis
 import json
-from utils import Listener, VKListener, Singleton
+# from utils import Listener, VKListener, Singleton
 
 
 class Convo(object):
@@ -36,21 +36,14 @@ class Convo(object):
         if self.chat_id:
             msg1 = msg.replace('<br />', '.\n')
             try:
-                msg = self.bot.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
-                # self.log(msg1, data={'type': 'send_message', 'markup': markup.to_json()})
-                self.db.convos.update_one({'bot_token': self.bot.token, 'chat_id': self.chat_id}, {'$set': {'last_message_id': msg.message_id}})
-                return msg
+                return self.bot.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
             except Exception, e:
                 print e
-
-    def log(self, txt, data=None):
-        self.db.logs.insert_one({'bot_token': self.bot.token, 'chat_id': self.chat_id, 'txt': txt, 'data': data})
 
     def edit_message(self, message_id, msg, markup=None):
         if self.chat_id:
             try:
                 msg1 = msg.replace('<br />', '.\n')
-                self.log(msg1, data={'type': 'edit_message', 'markup': markup.to_json()})
                 return self.bot.bot.edit_message_text(msg1, chat_id=self.chat_id, message_id=message_id, reply_markup=markup, parse_mode='HTML')
             except:
                 pass
@@ -64,11 +57,9 @@ class Convo(object):
             except:
                 pass
 
-        self.log(txt, data={'type': 'process_message'})
         self.get_current_view().process_message(txt)
 
     def process_callback(self, callback):
-        self.log(callback.data, data={'type': 'process_callback'})
         self.get_current_view().process_callback(callback)
 
     def process_file(self, doc):
@@ -177,7 +168,7 @@ bots = {}
 class MarketBot(object):
     convo_type = MarketBotConvo
 
-    def __init__(self, data, db=MongoClient(use_greenlets=True)['marketbot']):
+    def __init__(self, data, db=MongoClient()['marketbot']):
         self.token = data['token']
         self.convos = {}
         self.db = db
@@ -228,14 +219,17 @@ class MarketBot(object):
         convo = self.get_convo(doc.chat.id)
         convo.process_file(doc)
 
+    def update_last_id(self):
+        self.db.bots.update_one({'token': self.token}, {'$set': {'last_update_id': self.last_update_id}})
+
     def process_redis_update(self, update):
         try:
             if isinstance(update, basestring):
                 update = telebot.types.Update.de_json(update.encode('utf-8'))
                 if update.update_id > self.last_update_id:
                     self.last_update_id = update.update_id
-                    self.db.bots.update_one({'token': self.token}, {'$set': {'last_update_id': self.last_update_id}})
-                    self.bot.process_new_updates([update])
+                    gevent.spawn(self.bot.process_new_updates, [update])
+                    gevent.spawn(self.update_last_id)
         except Exception, e:
             print e
 
