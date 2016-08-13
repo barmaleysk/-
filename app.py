@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from gevent import monkey
-monkey.patch_all()
+monkey.patch_socket()
 
 import telebot
 from telebot import apihelper
@@ -179,7 +179,7 @@ bots = {}
 class MarketBot(object):
     convo_type = MarketBotConvo
 
-    def __init__(self, data, db=MongoClient('localhost', 27017, connect=False)['marketbot']):
+    def __init__(self, data, db=MongoClient(use_greenlets=True)['marketbot']):
         self.token = data['token']
         self.convos = {}
         self.db = db

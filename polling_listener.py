@@ -4,8 +4,6 @@ import copy
 import redis
 import json
 from utils import Listener
-from multiprocessing import Process
-from app import MasterBot
 
 
 class PollingProcessor(Singleton):
