@@ -44,5 +44,5 @@ class hello:
 
 if __name__ == "__main__":
     Listener(WebhookRegister().register_bot_by_redis, ['bots']).start()
-    Process(target=MasterBot({'token': '203526047:AAEmQJLm1JXmBgPeEQCZqkktReRUlup2Fgw'}).start).start()
+    Process(target=MasterBot({'token': open('token').read()}).start).start()
     app.run()
