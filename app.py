@@ -179,7 +179,6 @@ class MarketBot(object):
 
     def __init__(self, data, db=MongoClient('localhost', 27017, connect=False)['marketbot']):
         self.token = data['token']
-        self.data = data
         self.convos = {}
         self.db = db
         if not self.db.bots.update_one({'token': self.token}, {'$set': apihelper.get_me(self.token)}):
