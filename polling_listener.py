@@ -16,7 +16,7 @@ class PollingProcessor(Singleton):
         print data
         if isinstance(data['data'], basestring):
             try:
-                telebot.TeleBot(data['data']).remove_webhook()
+                print telebot.TeleBot(data['data']).remove_webhook()
                 self.tokens[data['data']] = 0
             except:
                 pass
