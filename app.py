@@ -173,11 +173,10 @@ class MainConvo(Convo):
 bots = {}
 
 
-class MarketBot():
+class MarketBot(object):
     convo_type = MarketBotConvo
 
     def __init__(self, data, db=MongoClient('localhost', 27017, connect=False)['marketbot']):
-        threading.Thread.__init__(self)
         self.token = data['token']
         self.data = data
         self.convos = {}
