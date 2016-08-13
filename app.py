@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import gevent
-from gevent import monkey; monkey.patch_all()
+from gevent import monkey; monkey.patch_all(httplib=True)
 import telebot
 from telebot import apihelper
 from pyexcel_xls import get_data
@@ -160,14 +160,34 @@ class MainConvo(Convo):
         self.tmpdata = items
 
 
-bots = {}
+class Bot(object):
+    bots = {}
+    WEBHOOK_HOST = 'ec2-52-34-35-240.us-west-2.compute.amazonaws.com'
+    WEBHOOK_PORT = 8443
+    WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
+    WEBHOOK_SSL_CERT = '/home/ubuntu/webhook_cert.pem'
+
+    def __init__(self, token):
+        self.token = token
+        Bot.bots[self.token] = self
+        gevent.spawn(self.set_webhook, self.token)
+
+    def set_webhook(self, token):
+        try:
+            bot = telebot.TeleBot(token)
+            bot.remove_webhook()
+            # print 'registered bot at', self.WEBHOOK_URL_BASE + '/' + bot.token + '/'
+            bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(self.WEBHOOK_SSL_CERT, 'r'))
+        except:
+            pass
 
 
-class MarketBot(object):
+class MarketBot(Bot):
     convo_type = MarketBotConvo
 
     def __init__(self, data, db=MongoClient()['marketbot']):
-        self.token = data['token']
+        super(MarketBot, self).__init__(data['token'])
+
         self.convos = {}
         self.db = db
         if not self.db.bots.update_one({'token': self.token}, {'$set': apihelper.get_me(self.token)}):
@@ -178,8 +198,6 @@ class MarketBot(object):
         self._init_bot()
         for convo_data in self.db.convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
-        bots[self.token] = self
-        self.redis.publish('bots', self.token)
 
     def _init_bot(self, threaded=False):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
@@ -241,24 +259,33 @@ class MasterBot(MarketBot):
         except Exception, e:
             print e
 
-    def run(self):
-        # VKListener().start()
-        # Listener(self.process_vk_output, ['vk_output']).start()
+    def __init__(self, data):
+        super(MasterBot, self).init(data)
+
         for bot_data in self.db.bots.find():
             if bot_data['token'] != self.token:
                 try:
                     MarketBot(bot_data, self.db)
                 except Exception, e:
                     print e
-        self.pubsub = self.redis.pubsub()
-        self.pubsub.subscribe(['updates'])
-        for item in self.pubsub.listen():
-            data = item['data']
-            if isinstance(data, basestring):
-                token, data = data.split('$$$$$')
-                if token in bots:
-                    b = bots[token]
-                    gevent.spawn(b.process_redis_update, data)
+        print Bot.bots
+
+    def route_update(self, token, update):
+        if token in Bot.bots:
+            gevent.spawn(Bot.bots[token].process_redis_update, update)
+            return
+        # VKListener().start()
+        # Listener(self.process_vk_output, ['vk_output']).start()
+
+        # self.pubsub = self.redis.pubsub()
+        # self.pubsub.subscribe(['updates'])
+        # for item in self.pubsub.listen():
+        #     data = item['data']
+        #     if isinstance(data, basestring):
+        #         token, data = data.split('$$$$$')
+        #         if token in bots:
+        #             b = bots[token]
+        #             gevent.spawn(b.process_redis_update, data)
 
 if __name__ == "__main__":
     m = MasterBot({'token': open('token').read().replace('\n', '')})
