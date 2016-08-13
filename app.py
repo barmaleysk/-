@@ -179,6 +179,7 @@ class MarketBot(object):
         self.db = db
         self.email = data.get('email')
         self.redis = redis.Redis()
+        self.last_update_id = 0
 
     def _init_bot(self, threaded=False):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
@@ -222,7 +223,9 @@ class MarketBot(object):
             update = data['data']
             if isinstance(data['data'], basestring):
                 update = telebot.types.Update.de_json(update.encode('utf-8'))
-                self.bot.process_new_updates([update])
+                if update.update_id > self.last_update_id:
+                    self.last_update_id = update.update_id
+                    self.bot.process_new_updates([update])
         except Exception, e:
             print e
 
