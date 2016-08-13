@@ -15,15 +15,15 @@ class WebhookRegister(Singleton):
     def set_webhook(self, token):
         bot = telebot.TeleBot(token)
         bot.remove_webhook()
-        print 'registered bot at', self.WEBHOOK_URL_BASE + '/' + bot.token + '/'
+        # print 'registered bot at', self.WEBHOOK_URL_BASE + '/' + bot.token + '/'
         bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(self.WEBHOOK_SSL_CERT, 'r'))
 
     def register_bot_by_redis(self, data):
         try:
             if isinstance(data['data'], basestring):
                 self.set_webhook(data['data'])
-        except Exception, e:
-            print e
+        except Exception:
+            pass
 
 CherryPyWSGIServer.ssl_certificate = "/home/ubuntu/webhook_cert.pem"
 CherryPyWSGIServer.ssl_private_key = "/home/ubuntu/webhook_pkey.pem"
