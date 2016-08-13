@@ -233,7 +233,7 @@ class MarketBot(object):
                 update = telebot.types.Update.de_json(update.encode('utf-8'))
                 if update.update_id > self.last_update_id:
                     self.last_update_id = update.update_id
-                    self.db.bots.update_one({'token': self.token, '$set': {'last_update_id': self.last_update_id}})
+                    self.db.bots.update_one({'token': self.token}, {'$set': {'last_update_id': self.last_update_id}})
                     self.bot.process_new_updates([update])
         except Exception, e:
             print e
