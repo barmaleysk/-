@@ -263,6 +263,7 @@ class MasterBot(MarketBot):
             try:
                 data = item['data']
                 token, data = data.split('$$$$$')
+                print data, token, bots
                 if token in bots:
                     bots[token].process_redis_update(data)
             except:
