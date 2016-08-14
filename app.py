@@ -8,16 +8,12 @@ from StringIO import StringIO
 from pymongo import MongoClient
 import pandas as pd
 from views import *
-import redis
-import json
-from gevent.server import StreamServer
 # from utils import Listener, VKListener, Singleton
 
 
 class Convo(object):
     def __init__(self, data, bot):
         self.bot = bot
-        self.redis = bot.redis
         self.token = bot.token
         self.db = bot.db
         self.chat_id = data['chat_id']
@@ -193,7 +189,6 @@ class MarketBot(Bot):
         if not self.db.bots.update_one({'token': self.token}, {'$set': apihelper.get_me(self.token)}):
             self.db.bots.insert_one({'token': self.token})
         self.email = data.get('email')
-        self.redis = redis.Redis()
         self.last_update_id = data.get('last_update_id') or 0
         self._init_bot()
         for convo_data in self.db.convos.find({'bot_token': self.token}):
@@ -250,14 +245,14 @@ class MarketBot(Bot):
 class MasterBot(MarketBot):
     convo_type = MainConvo
 
-    def process_vk_output(self, data):
-        try:
-            data = json.loads(data['data'])
-            convo = self.get_convo(data['chat_id'])
-            convo.tmpdata = data['data']
-            convo.get_current_view().process_message('ОК')
-        except Exception, e:
-            print e
+    # def process_vk_output(self, data):
+    #     try:
+    #         data = json.loads(data['data'])
+    #         convo = self.get_convo(data['chat_id'])
+    #         convo.tmpdata = data['data']
+    #         convo.get_current_view().process_message('ОК')
+    #     except Exception, e:
+    #         print e
 
     def __init__(self, data):
         super(MasterBot, self).__init__(data)

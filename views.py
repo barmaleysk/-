@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import gevent
+from gevent import monkey; monkey.patch_all()
 from telebot import types
 import telebot
 from validate_email import validate_email
@@ -7,7 +9,7 @@ import pymongo
 from datetime import datetime
 from utils import Mailer, striphtml
 from collections import defaultdict
-import json
+from vk_crawler import Crawler
 
 
 class MarkupMixin(object):
@@ -321,6 +323,10 @@ class DetailsView(View):
             self.ptr -= 1
             self.render()
 
+    def analyze_vk_link(self, url):
+        self.ctx.tmpdata = Crawler(url).fetch()
+        self.process_message('ОК')
+
     def process_message(self, cmd):
         if cmd == 'ОК':
             if isinstance(self.current(), FileDetail) and self.ctx.tmpdata is not None:
@@ -348,10 +354,11 @@ class DetailsView(View):
             elif isinstance(self.current(), FileDetail):
                 if 'vk.com' in cmd:
                     try:
-                        self.ctx.redis.publish('vk_input', json.dumps({'token': self.ctx.token, 'chat_id': self.ctx.chat_id, 'url': cmd}))
+                        # self.ctx.redis.publish('vk_input', json.dumps({'token': self.ctx.token, 'chat_id': self.ctx.chat_id, 'url': cmd}))
+                        gevent.spawn(self.analyze_vk_link, cmd)
                         self.ctx.send_message('Анализирую..')
                         self.ctx.tmpdata = None
-                    except Exception, e:
+                    except Exception:
                         self.ctx.send_message('Неверный формат магазина')
 
 
