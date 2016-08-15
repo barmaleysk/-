@@ -33,7 +33,6 @@ class Convo(object):
             msg1 = msg.replace('<br />', '.\n')
             gevent.spawn(apihelper.send_message, self.token, self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
             return
-            # gevent.spawn(self.bot.bot.send_message(self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
 
     def edit_message(self, message_id, msg, markup=None):
         if self.chat_id:
@@ -245,15 +244,6 @@ class MarketBot(Bot):
 class MasterBot(MarketBot):
     convo_type = MainConvo
 
-    # def process_vk_output(self, data):
-    #     try:
-    #         data = json.loads(data['data'])
-    #         convo = self.get_convo(data['chat_id'])
-    #         convo.tmpdata = data['data']
-    #         convo.get_current_view().process_message('ОК')
-    #     except Exception, e:
-    #         print e
-
     def __init__(self, data):
         super(MasterBot, self).__init__(data)
 
@@ -269,18 +259,6 @@ class MasterBot(MarketBot):
         if token in Bot.bots:
             gevent.spawn(Bot.bots[token].process_redis_update, update)
             return
-        # VKListener().start()
-        # Listener(self.process_vk_output, ['vk_output']).start()
-
-        # self.pubsub = self.redis.pubsub()
-        # self.pubsub.subscribe(['updates'])
-        # for item in self.pubsub.listen():
-        #     data = item['data']
-        #     if isinstance(data, basestring):
-        #         token, data = data.split('$$$$$')
-        #         if token in bots:
-        #             b = bots[token]
-        #             gevent.spawn(b.process_redis_update, data)
 
 if __name__ == "__main__":
     m = MasterBot({'token': open('token').read().replace('\n', '')})

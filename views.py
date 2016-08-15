@@ -669,7 +669,7 @@ class OrderCreatorView(DetailsView):
         order['token'] = self.ctx.token
         order['number'] = len(self.orders)
         self.ctx.db.orders.insert_one(order)
-        Mailer().send_order(self.ctx.get_bot_data()['email'], order)
+        gevent.spawn(Mailer().send_order, self.ctx.get_bot_data()['email'], order)
         self.ctx.current_basket = None
 
 

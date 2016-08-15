@@ -1,11 +1,6 @@
-import gevent
 from gevent import monkey; monkey.patch_all()
 import web
 from web.wsgiserver import CherryPyWSGIServer
-import redis
-from utils import Singleton
-import telebot
-from utils import Listener
 from app import MasterBot
 
 
@@ -14,7 +9,6 @@ CherryPyWSGIServer.ssl_private_key = "/home/ubuntu/webhook_pkey.pem"
 
 urls = ("/.*", "hello")
 app = web.application(urls, globals())
-# r = redis.Redis()
 mb = MasterBot({'token': open('token').read().replace('\n', '')})
 
 

@@ -1,3 +1,4 @@
+from gevent import monkey; monkey.patch_all()
 from utils import Singleton
 import telebot
 import copy
