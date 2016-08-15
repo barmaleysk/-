@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sendgrid
+import os
 from sendgrid.helpers.mail import *
 import re
 
@@ -15,7 +16,7 @@ class Singleton(object):
 
 
 class Mailer(Singleton):
-    sg = sendgrid.SendGridAPIClient(apikey=open('sendgrid.env').read())
+    sg = sendgrid.SendGridAPIClient(apikey=os.environ.get('SENDGRID_API_KEY'))
 
     def send(self, mail, subj, txt):
         from_email = Email("order@botmarket.com")
