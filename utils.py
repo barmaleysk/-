@@ -31,7 +31,7 @@ class Mailer(Singleton):
         res += '\n'.join(i['name'].encode('utf-8') + ' x ' + str(i['count']) for i in order['items'])
         res += '\n-----\n Итого: ' + str(order['total']) + ' руб.'
         res += '\n-----\n Детали доставки: \n'
-        res += '\n\n'.join(k.encode('utf-8') + u': ' + v.encode('utf-8') for k, v in order['delivery'].items())
+        res += '\n\n'.join(k.encode('utf-8') + ': ' + v.encode('utf-8') for k, v in order['delivery'].items())
         res = res.replace('Ваш', '')
         return self.send(mail, 'Новый заказ!', res)
 
