@@ -7,3 +7,4 @@ main.py
 *.env
 *.log
 token.dev
+token

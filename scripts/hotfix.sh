@@ -1,0 +1,1 @@
+git add . && git commit -m 'hotfix' && git push origin master && ./scripts/deploy.sh
