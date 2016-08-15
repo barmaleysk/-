@@ -472,7 +472,6 @@ class BasketNode(View):
         self.item_ptr = 0
         self.editable = True
         self.ctx.current_basket = self
-        self.total_threshold = int(self.ctx.get_bot_data().get('total_threshold')) or 0
 
     def to_dict(self):
         return {
@@ -486,6 +485,7 @@ class BasketNode(View):
 
     def activate(self):
         self.items = list(set(self.items + self.get_ordered_items()))
+        self.total_threshold = int(self.ctx.get_bot_data().get('total_threshold') or 0)
         self.item_ptr = 0
 
     def current_item(self):
