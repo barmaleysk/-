@@ -8,7 +8,6 @@ from StringIO import StringIO
 from pymongo import MongoClient
 import pandas as pd
 from views import *
-# from utils import Listener, VKListener, Singleton
 
 
 class Convo(object):
@@ -107,7 +106,8 @@ class MainConvo(Convo):
             EmailDetail('shop.email', name='email для приема заказов', ctx=self),
             FileDetail('shop.items', name='файл с описанием товаров или url магазина вконтакте', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">Пример файла</a>'),
             TextDetail('shop.delivery_info', name='текст с условиями доставки'),
-            TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + str(self.bot.bot.get_chat(self.chat_id).username))
+            TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + str(self.bot.bot.get_chat(self.chat_id).username)),
+            NumberDetail('shop.total_threshold', name='минимальную сумму заказа', value='0')
         ], final_message='Магазин создан!')
         self.views['settings_view'] = BotSettingsView(self, msg='Настройки', links={'Главное меню': ['main_view']})
         self.views['select_bot_orders_view'] = SelectBotOrdersView(self, msg='Выберите магазин')

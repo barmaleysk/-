@@ -211,6 +211,15 @@ class TextDetail(Detail):
     pass
 
 
+class NumberDetail(Detail):
+    def validate(self, value):
+        try:
+            int(value)
+            return True
+        except ValueError:
+            return False
+
+
 class TokenDetail(TextDetail):
     def validate(self, value):
         if self.ctx.db.bots.find_one({'token': value}) is not None:
@@ -344,22 +353,27 @@ class DetailsView(View):
             self.prev()
         elif cmd == 'главное меню':
             self.ctx.route(['main_view'])
-        else:
-            if isinstance(self.current(), TextDetail):
-                if self.current().validate(cmd):
-                    self.current().value = cmd
-                    self.next()
-                else:
-                    self.ctx.send_message('Неверный формат')
-            elif isinstance(self.current(), FileDetail):
-                if 'vk.com' in cmd:
-                    try:
-                        # self.ctx.redis.publish('vk_input', json.dumps({'token': self.ctx.token, 'chat_id': self.ctx.chat_id, 'url': cmd}))
-                        gevent.spawn(self.analyze_vk_link, cmd)
-                        self.ctx.send_message('Анализирую..')
-                        self.ctx.tmpdata = None
-                    except Exception:
-                        self.ctx.send_message('Неверный формат магазина')
+        elif isinstance(self.current(), TextDetail):
+            if self.current().validate(cmd):
+                self.current().value = cmd
+                self.next()
+            else:
+                self.ctx.send_message('Неверный формат')
+        elif isinstance(self.current(), NumberDetail):
+            if self.current().validate(cmd):
+                self.current().value = cmd
+                self.next()
+            else:
+                self.ctx.send_message('Введите целое число')
+        elif isinstance(self.current(), FileDetail):
+            if 'vk.com' in cmd:
+                try:
+                    # self.ctx.redis.publish('vk_input', json.dumps({'token': self.ctx.token, 'chat_id': self.ctx.chat_id, 'url': cmd}))
+                    gevent.spawn(self.analyze_vk_link, cmd)
+                    self.ctx.send_message('Анализирую..')
+                    self.ctx.tmpdata = None
+                except Exception:
+                    self.ctx.send_message('Неверный формат магазина')
 
 
 class BotCreatorView(DetailsView):
@@ -375,7 +389,8 @@ class BotCreatorView(DetailsView):
             'email': dd['shop.email'],
             'chat_id': self.ctx.chat_id,
             'delivery_info': dd['shop.delivery_info'],
-            'contacts_info': dd['shop.contacts_info']
+            'contacts_info': dd['shop.contacts_info'],
+            'total_threshold': dd['shop.total_threshold']
         }
 
     def finalize(self):
@@ -469,6 +484,7 @@ class BasketNode(View):
 
     def activate(self):
         self.items = list(set(self.items + self.get_ordered_items()))
+        self.total_threshold = int(self.ctx.get_bot_data().get('total_threshold') or 0)
         self.item_ptr = 0
 
     def current_item(self):
@@ -524,6 +540,8 @@ class BasketNode(View):
             self.add()
         elif action == '-':
             self.sub()
+        elif action == '<<':
+            self.ctx.send_message('Минимальная сумма заказа ' + str(self.total_threshold) + ' рублей')
 
     def get_markup(self):
         if self.get_total() > 0:
@@ -534,7 +552,10 @@ class BasketNode(View):
                 self.btn('+', 'basket:+')
             )
             markup.row(self.btn('<', 'basket:<'), self.btn(str(self.item_ptr + 1) + '/' + str(len(self.items)), 'basket:ptr'), self.btn('>', 'basket:>'))
-            markup.row(self.btn('Заказ на ' + str(self.get_total()) + ' р. Оформить?', 'link:delivery'))
+            if self.get_total() < self.total_threshold:
+                markup.row(self.btn('Минимальная сумма заказа ' + str(self.total_threshold) + ' рублей', 'basket:<<'))
+            else:
+                markup.row(self.btn('Заказ на ' + str(self.get_total()) + ' р. Оформить?', 'link:delivery'))
             return markup
         else:
             return None
@@ -672,7 +693,8 @@ class BotSettingsView(NavigationView):
                 EmailDetail('shop.email', name='email для приема заказов', ctx=self.ctx, value=bot['email']),
                 FileDetail('shop.items', value=bot['items'], name='файл с описанием товаров или url магазина вконтакте', desc='<a href="https://github.com/0-1-0/marketbot/blob/master/sample.xlsx?raw=true">(Пример файла)</a>'),
                 TextDetail('shop.delivery_info', name='текст с условиями доставки', value=bot.get('delivery_info')),
-                TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info'))
+                TextDetail('shop.contacts_info', name='текст с контактами для связи', value=bot.get('contacts_info')),
+                NumberDetail('shop.total_threshold', name='минимальную сумму заказа', value=bot.get('total_threshold'))
             ], final_message='Магазин сохранен!')
         return super(BotSettingsView, self).get_subview(token)
 
