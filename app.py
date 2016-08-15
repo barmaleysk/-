@@ -219,11 +219,11 @@ class MarketBot(Bot):
 
     def process_callback(self, callback):
         convo = self.get_convo(callback.message.chat.id)
-        convo.process_callback(callback)
+        gevent.spawn(convo.process_callback, callback)
 
     def process_message(self, message):
         convo = self.get_convo(message.chat.id)
-        convo.process_message(message)
+        gevent.spawn(convo.process_message, message)
 
     def start_bot(self, bot_data):
         MarketBot(bot_data, self.db)
