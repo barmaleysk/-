@@ -227,6 +227,7 @@ class MarketBot(Bot):
 
     def start_bot(self, bot_data):
         MarketBot(bot_data, self.db)
+        print Bot.bots
 
     def process_file(self, doc):
         convo = self.get_convo(doc.chat.id)
