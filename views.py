@@ -19,8 +19,8 @@ class MarkupMixin(object):
             markup.row(self.BTN(cmd))
         return markup
 
-    def BTN(self, txt, request_contact=None):
-        return types.KeyboardButton(txt, request_contact=request_contact)
+    def BTN(self, txt, request_contact=None, request_location=None):
+        return types.KeyboardButton(txt, request_contact=request_contact, request_location=request_location)
 
     def mk_inline_markup(self, command_list):
         markup = types.InlineKeyboardMarkup(row_width=2)
@@ -303,7 +303,9 @@ class DetailsView(View):
             if self.current().is_filled() or isinstance(self.current(), FileDetail):
                 markup.row(self.BTN('ОК'))
             if self.current()._id == 'phone':
-                markup.row(self.BTN('отправить номер', True))
+                markup.row(self.BTN('отправить номер', request_contact=True))
+            if self.current()._id == 'address':
+                markup.row(self.BTN('отправить геолокацию', request_location=True))
             if len(self.current().default_options) > 0:
                 markup.row(*[self.BTN(opt) for opt in self.current().default_options])
             if self.ptr > 0:

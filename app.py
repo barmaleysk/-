@@ -8,6 +8,7 @@ from StringIO import StringIO
 from pymongo import MongoClient
 import pandas as pd
 from views import *
+from utils import get_address
 
 
 class Convo(object):
@@ -44,10 +45,12 @@ class Convo(object):
         try:
             txt = message.text.encode('utf-8')
         except:
-            try:
+            if hasattr(message, 'contact') and message.contact is not None:
                 txt = message.contact.phone_number
-            except:
-                pass
+            if hasattr(message, 'location') and message.location is not None:
+                txt = get_address(message.location.latitude, message.location.longitude).encode('utf-8')
+                if txt:
+                    self.send_message(txt)
 
         self.get_current_view().process_message(txt)
 
@@ -198,7 +201,7 @@ class MarketBot(Bot):
         self.bot.add_message_handler(self.goto_main, commands=['start'])
         self.bot.add_callback_query_handler(self.process_callback, func=lambda call: True)
         self.bot.add_message_handler(self.process_file, content_types=['document'])
-        self.bot.add_message_handler(self.process_message, func=lambda message: True, content_types=['text', 'contact'])
+        self.bot.add_message_handler(self.process_message, func=lambda message: True, content_types=['text', 'contact', 'location'])
 
     def init_convo(self, convo_data):
         self.convos[convo_data['chat_id']] = self.convo_type(convo_data, self)

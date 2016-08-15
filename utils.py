@@ -4,6 +4,13 @@ import sendgrid
 import os
 from sendgrid.helpers.mail import *
 import re
+import requests
+import json
+
+
+def get_address(lat, lng):
+    resp = requests.get('http://maps.googleapis.com/maps/api/geocode/json?latlng=' + str(lat) + ',' + str(lng) + '&language=ru')
+    return json.loads(resp.content).get('results')[0].get('formatted_address')
 
 
 class Singleton(object):
