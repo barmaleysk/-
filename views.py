@@ -359,22 +359,21 @@ class DetailsView(View):
                 self.next()
             else:
                 self.ctx.send_message('Неверный формат')
-        else:
-            if isinstance(self.current(), NumberDetail):
-                if self.current().validate(cmd):
-                    self.current().value = cmd
-                    self.next()
-                else:
-                    self.ctx.send_message('Введите целое число')
-            elif isinstance(self.current(), FileDetail):
-                if 'vk.com' in cmd:
-                    try:
-                        # self.ctx.redis.publish('vk_input', json.dumps({'token': self.ctx.token, 'chat_id': self.ctx.chat_id, 'url': cmd}))
-                        gevent.spawn(self.analyze_vk_link, cmd)
-                        self.ctx.send_message('Анализирую..')
-                        self.ctx.tmpdata = None
-                    except Exception:
-                        self.ctx.send_message('Неверный формат магазина')
+        elif isinstance(self.current(), NumberDetail):
+            if self.current().validate(cmd):
+                self.current().value = cmd
+                self.next()
+            else:
+                self.ctx.send_message('Введите целое число')
+        elif isinstance(self.current(), FileDetail):
+            if 'vk.com' in cmd:
+                try:
+                    # self.ctx.redis.publish('vk_input', json.dumps({'token': self.ctx.token, 'chat_id': self.ctx.chat_id, 'url': cmd}))
+                    gevent.spawn(self.analyze_vk_link, cmd)
+                    self.ctx.send_message('Анализирую..')
+                    self.ctx.tmpdata = None
+                except Exception:
+                    self.ctx.send_message('Неверный формат магазина')
 
 
 class BotCreatorView(DetailsView):
