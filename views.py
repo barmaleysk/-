@@ -15,9 +15,12 @@ from vk_crawler import Crawler
 
 class MarkupMixin(object):
     def mk_markup(self, command_list):
-        markup = types.ReplyKeyboardMarkup()
-        for cmd in command_list:
-            markup.row(self.BTN(cmd))
+        markup = types.ReplyKeyboardMarkup(row_width=2)
+        btns = [self.BTN(cmd) for cmd in command_list]
+        for btn in btns[:min(3, len(btns))]:
+            markup.row(btn)
+
+        markup.add(*btns[3:])
         return markup
 
     def BTN(self, txt, request_contact=None, request_location=None):
