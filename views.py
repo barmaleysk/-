@@ -708,7 +708,7 @@ class BotSettingsView(NavigationView):
         self.views = {}
         for bot in self.ctx.db.bots.find({'chat_id': self.ctx.chat_id}):
             self.links[bot['username']] = ['settings_view', bot['token']]
-            self.links['Главное меню'] = ['main_view']
+        self.links['Главное меню'] = ['main_view']
         super(BotSettingsView, self).activate()
 
 
@@ -724,7 +724,7 @@ class SelectBotMailingView(NavigationView):
         self.views = {}
         for bot in self.ctx.db.bots.find({'chat_id': self.ctx.chat_id}):
             self.links[bot['username']] = ['mailing_view', bot['token']]
-            self.links['Главное меню'] = ['main_view']
+        self.links['Главное меню'] = ['main_view']
         super(SelectBotMailingView, self).activate()
 
 
