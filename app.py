@@ -9,6 +9,9 @@ from pymongo import MongoClient
 import pandas as pd
 from views import *
 from utils import get_address
+import botan
+
+botan_token = 'BLe0W1GY8SwbNijJ0H-lroERrA9BnK0t'
 
 
 class Convo(object):
@@ -249,6 +252,10 @@ class MarketBot(Bot):
 
 class MasterBot(MarketBot):
     convo_type = MainConvo
+
+    def process_message(self, message):
+        gevent.spawn(botan.track, botan_token, message.chat.id, {}, message.text)
+        super(MasterBot, self).process_message(message)
 
     def __init__(self, data):
         super(MasterBot, self).__init__(data)
