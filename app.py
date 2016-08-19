@@ -56,7 +56,7 @@ class Convo(object):
         self.get_current_view().process_message(txt)
 
     def process_photo(self, photo):
-        caption = photo.photo.caption
+        caption = photo.caption
         fid = photo.photo[-1].file_id
         file_info = self.bot.bot.get_file(fid)
         content = self.bot.bot.download_file(file_info.file_path)
