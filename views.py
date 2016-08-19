@@ -107,7 +107,7 @@ class NavigationView(View):
         super(NavigationView, self).__init__(ctx, False, msg)
 
     def get_markup(self):
-        return self.mk_markup(list(reversed(self.links.keys())))
+        return self.mk_markup(sorted([l.decode('utf-8') for l in self.links.keys()]))
 
     def process_message(self, message):
         if message in self.links:
@@ -770,7 +770,7 @@ class BotSettingsView(NavigationView):
         self.links = {}
         self.views = {}
         for bot in self.ctx.db.bots.find({'chat_id': self.ctx.chat_id}):
-            self.links[bot['username']] = ['settings_view', bot['token']]
+            self.links['@' + bot['username']] = ['settings_view', bot['token']]
         self.links['Главное меню'] = ['main_view']
         super(BotSettingsView, self).activate()
 
@@ -786,7 +786,7 @@ class SelectBotMailingView(NavigationView):
         self.links = {}
         self.views = {}
         for bot in self.ctx.db.bots.find({'chat_id': self.ctx.chat_id}):
-            self.links[bot['username']] = ['mailing_view', bot['token']]
+            self.links['@' + bot['username']] = ['mailing_view', bot['token']]
         self.links['Главное меню'] = ['main_view']
         super(SelectBotMailingView, self).activate()
 
@@ -864,7 +864,7 @@ class SelectBotOrdersView(NavigationView):
     def activate(self):
         self.views = {}
         bots = self.ctx.db.bots.find({'chat_id': self.ctx.chat_id})
-        self.links = {bot['username']: ['select_bot_orders_view', bot['token']] for bot in bots}
+        self.links = {'@' + bot['username']: ['select_bot_orders_view', bot['token']] for bot in bots}
         self.links['Главное меню'] = ['main_view']
         super(SelectBotOrdersView, self).activate()
 
