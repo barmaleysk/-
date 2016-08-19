@@ -7,10 +7,14 @@ import telebot
 from telebot import apihelper
 from validate_email import validate_email
 import pymongo
+from io import BytesIO
+from StringIO import StringIO
 from datetime import datetime
 from utils import Mailer, striphtml
 from collections import defaultdict
 from vk_crawler import Crawler
+from pyexcel_xls import get_data
+import pandas as pd
 
 
 class MarkupMixin(object):
@@ -59,6 +63,18 @@ class View(MarkupMixin):
         pass
 
     def process_callback(self, callback):
+        pass
+
+    def process_photo(self, photo):
+        pass
+
+    def process_file(self, doc):
+        pass
+
+    def process_sticker(self, sticker):
+        pass
+
+    def process_video(self, video):
         pass
 
     def activate(self):
@@ -406,6 +422,50 @@ class BotCreatorView(DetailsView):
         self.ctx.db.bots.save(bot_data)
         self.ctx.bot.start_bot(bot_data)
 
+    def process_file(self, doc):
+        fid = doc.document.file_id
+        file_info = self.ctx.bot.bot.get_file(fid)
+        file_format = file_info.file_path.split('.')[-1]
+        if file_format in ['csv', 'xls', 'xlsx']:
+            content = self.ctx.bot.bot.download_file(file_info.file_path)
+            io = StringIO(content)
+            try:
+                df = pd.read_csv(io)
+            except:
+                excel_data = get_data(io)
+                _keys = excel_data.values()[0][0]
+                _values = excel_data.values()[0][1:]
+                _items = [dict(zip(_keys, rec)) for rec in _values]
+                df = pd.DataFrame(_items)
+
+            df_keys = {k.lower(): k for k in df.to_dict().keys()}
+            data = pd.DataFrame()
+
+            mapping = {
+                'id': ['id', 'product_id'],
+                'active': ['active', 'visible', u'активно'],
+                'cat': ['category', u'раздел 1', u'категория'],
+                'name': [u'наименование', 'name'],
+                'desc': [u'описание', 'description', 'description(html)'],
+                'price': ['price', u'цена'],
+                'img': ['img_url', u'изображение', u'ссылка на изображение']
+            }
+
+            for k, values in mapping.items():
+                for col_name in values:
+                    if col_name in df_keys:
+                        data[k] = df[df_keys[col_name]]
+
+            data['active'] = data['active'].map(lambda x: '1' if x in [1, 'y'] else '0')
+            items = data.T.to_dict().values()
+            # print items
+            if len(items) == 0:
+                raise Exception("no items added")
+
+            self.ctx.tmpdata = items
+        else:
+            pass
+
 
 class ItemNode(View):
     def __init__(self, menu_item, _id, ctx, menu):
@@ -736,7 +796,7 @@ class MailingView(NavigationView):
         self.ctx = ctx
         self.token = bot_token
         self.editable = True
-        self.msg = 'Введите текст рассылки'
+        self.msg = 'Введите текст, прикрепите фото или стикер рассылки'
         self.links = {"Назад": ['mailing_view'],
                       "Главное меню": ['main_view']
                       }
@@ -747,6 +807,52 @@ class MailingView(NavigationView):
         else:
             for convo in self.ctx.db.convos.find({'bot_token': self.token}):
                 gevent.spawn(apihelper.send_message, self.token, convo['chat_id'], message, reply_markup=None, parse_mode='HTML')
+
+    def process_file(self, doc):
+        fid = doc.document.file_id
+        file_info = self.ctx.bot.bot.get_file(fid)
+        content = self.ctx.bot.bot.download_file(file_info.file_path)
+        file_format = file_info.file_path.split('.')[-1]
+        if file_format in ['gif', 'mp4']:
+            for convo in self.ctx.db.convos.find({'bot_token': self.token}):
+                doc = BytesIO(content)
+                doc.name = fid + '.' + file_format
+                gevent.spawn(apihelper.send_data, self.token, convo['chat_id'], doc, 'document', reply_markup=None)
+        else:
+            pass
+
+    def process_photo(self, photo):
+        caption = photo.caption
+        fid = photo.photo[-1].file_id
+        file_info = self.ctx.bot.bot.get_file(fid)
+        content = self.ctx.bot.bot.download_file(file_info.file_path)
+        file_format = file_info.file_path.split('.')[-1]
+        for convo in self.ctx.db.convos.find({'bot_token': self.token}):
+            photo = BytesIO(content)
+            photo.name = fid + '.' + file_format
+            gevent.spawn(apihelper.send_photo, self.token, convo['chat_id'], photo, caption=caption, reply_markup=None)
+
+    def process_sticker(self, sticker):
+        fid = sticker.sticker.file_id
+        file_info = self.ctx.bot.bot.get_file(fid)
+        content = self.ctx.bot.bot.download_file(file_info.file_path)
+        file_format = file_info.file_path.split('.')[-1]
+        for convo in self.ctx.db.convos.find({'bot_token': self.token}):
+            doc = BytesIO(content)
+            doc.name = fid + '.' + file_format
+            gevent.spawn(apihelper.send_data, self.token, convo['chat_id'], doc, 'sticker', reply_markup=None)
+
+    def process_video(self, video):
+        caption = video.caption
+        duration = video.video.duration
+        fid = video.video.file_id
+        file_info = self.ctx.bot.bot.get_file(fid)
+        content = self.ctx.bot.bot.download_file(file_info.file_path)
+        file_format = file_info.file_path.split('.')[-1]
+        for convo in self.ctx.db.convos.find({'bot_token': self.token}):
+            video = BytesIO(content)
+            video.name = fid + '.' + file_format
+            gevent.spawn(apihelper.send_video, self.token, convo['chat_id'], video, caption=caption, duration=duration, reply_markup=None)
 
 
 class SelectBotOrdersView(NavigationView):
