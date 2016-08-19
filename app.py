@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
+import requests
 import gevent
 from gevent import monkey; monkey.patch_all()
 import telebot
 from telebot import apihelper
-from pyexcel_xls import get_data
 from StringIO import StringIO
+from io import BytesIO
 from pymongo import MongoClient
-import pandas as pd
 from views import *
 from utils import get_address
 import botan
@@ -54,14 +54,22 @@ class Convo(object):
                 txt = get_address(message.location.latitude, message.location.longitude).encode('utf-8')
                 if txt:
                     self.send_message(txt)
-
         self.get_current_view().process_message(txt)
+
+    def process_photo(self, photo):
+        self.get_current_view().process_photo(photo)
+
+    def process_sticker(self, sticker):
+        self.get_current_view().process_sticker(sticker)
+
+    def process_video(self, video):
+        self.get_current_view().process_video(video)
 
     def process_callback(self, callback):
         self.get_current_view().process_callback(callback)
 
     def process_file(self, doc):
-        pass
+        self.get_current_view().process_file(doc)
 
     def set_path(self, path):
         self.path = path
@@ -122,46 +130,6 @@ class MainConvo(Convo):
         if not self.get_current_view():
             self.route(['main_view'])
 
-    def process_file(self, doc):
-        fid = doc.document.file_id
-        file_info = self.bot.bot.get_file(fid)
-        content = self.bot.bot.download_file(file_info.file_path)
-        io = StringIO(content)
-        try:
-            df = pd.read_csv(io)
-        except:
-            excel_data = get_data(io)
-            _keys = excel_data.values()[0][0]
-            _values = excel_data.values()[0][1:]
-            _items = [dict(zip(_keys, rec)) for rec in _values]
-            df = pd.DataFrame(_items)
-
-        df_keys = {k.lower(): k for k in df.to_dict().keys()}
-        data = pd.DataFrame()
-
-        mapping = {
-            'id': ['id', 'product_id'],
-            'active': ['active', 'visible', u'активно'],
-            'cat': ['category', u'раздел 1', u'категория'],
-            'name': [u'наименование', 'name'],
-            'desc': [u'описание', 'description', 'description(html)'],
-            'price': ['price', u'цена'],
-            'img': ['img_url', u'изображение', u'ссылка на изображение']
-        }
-
-        for k, values in mapping.items():
-            for col_name in values:
-                if col_name in df_keys:
-                    data[k] = df[df_keys[col_name]]
-
-        data['active'] = data['active'].map(lambda x: '1' if x in [1, 'y'] else '0')
-        items = data.T.to_dict().values()
-        # print items
-        if len(items) == 0:
-            raise Exception("no items added")
-
-        self.tmpdata = items
-
 
 class Bot(object):
     bots = {}
@@ -205,6 +173,9 @@ class MarketBot(Bot):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
         self.bot.add_message_handler(self.goto_main, commands=['start'])
         self.bot.add_callback_query_handler(self.process_callback, func=lambda call: True)
+        self.bot.add_message_handler(self.process_photo, content_types=['photo'])
+        self.bot.add_message_handler(self.process_video, content_types=['video'])
+        self.bot.add_message_handler(self.process_sticker, content_types=['sticker'])
         self.bot.add_message_handler(self.process_file, content_types=['document'])
         self.bot.add_message_handler(self.process_message, func=lambda message: True, content_types=['text', 'contact', 'location'])
 
@@ -237,6 +208,18 @@ class MarketBot(Bot):
     def process_file(self, doc):
         convo = self.get_convo(doc.chat.id)
         convo.process_file(doc)
+
+    def process_sticker(self, sticker):
+        convo = self.get_convo(sticker.chat.id)
+        convo.process_sticker(sticker)
+
+    def process_video(self, video):
+        convo = self.get_convo(video.chat.id)
+        convo.process_video(video)
+
+    def process_photo(self, photo):
+        convo = self.get_convo(photo.chat.id)
+        gevent.spawn(convo.process_photo, photo)
 
     def update_last_id(self):
         self.db.bots.update_one({'token': self.token}, {'$set': {'last_update_id': self.last_update_id}})
