@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
-import requests
 import gevent
 from gevent import monkey; monkey.patch_all()
 import telebot
 from telebot import apihelper
-from StringIO import StringIO
-from io import BytesIO
 from pymongo import MongoClient
 from views import *
 from utils import get_address

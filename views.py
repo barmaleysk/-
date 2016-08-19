@@ -796,7 +796,7 @@ class MailingView(NavigationView):
         self.ctx = ctx
         self.token = bot_token
         self.editable = True
-        self.msg = 'Введите текст рассылки'
+        self.msg = 'Введите текст, прикрепите фото или стикер рассылки'
         self.links = {"Назад": ['mailing_view'],
                       "Главное меню": ['main_view']
                       }
