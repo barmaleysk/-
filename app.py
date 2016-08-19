@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+import requests
 import gevent
 from gevent import monkey; monkey.patch_all()
 import telebot
 from telebot import apihelper
 from pyexcel_xls import get_data
 from StringIO import StringIO
+from io import BytesIO
 from pymongo import MongoClient
 import pandas as pd
 from views import *
@@ -51,8 +53,17 @@ class Convo(object):
                 txt = get_address(message.location.latitude, message.location.longitude).encode('utf-8')
                 if txt:
                     self.send_message(txt)
-
         self.get_current_view().process_message(txt)
+
+    def process_photo(self, photo):
+        caption = photo.photo.caption
+        fid = photo.photo[-1].file_id
+        file_info = self.bot.bot.get_file(fid)
+        content = self.bot.bot.download_file(file_info.file_path)
+        file_format = file_info.file_path.split('.')[-1]
+        photo = BytesIO(content)
+        photo.name = fid + '.' + file_format
+        self.get_current_view().process_photo(photo, caption)
 
     def process_callback(self, callback):
         self.get_current_view().process_callback(callback)
@@ -202,6 +213,7 @@ class MarketBot(Bot):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
         self.bot.add_message_handler(self.goto_main, commands=['start'])
         self.bot.add_callback_query_handler(self.process_callback, func=lambda call: True)
+        self.bot.add_message_handler(self.process_photo, content_types=['photo'])
         self.bot.add_message_handler(self.process_file, content_types=['document'])
         self.bot.add_message_handler(self.process_message, func=lambda message: True, content_types=['text', 'contact', 'location'])
 
@@ -234,6 +246,10 @@ class MarketBot(Bot):
     def process_file(self, doc):
         convo = self.get_convo(doc.chat.id)
         convo.process_file(doc)
+
+    def process_photo(self, photo):
+        convo = self.get_convo(photo.chat.id)
+        convo.process_photo(photo)
 
     def update_last_id(self):
         self.db.bots.update_one({'token': self.token}, {'$set': {'last_update_id': self.last_update_id}})

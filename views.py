@@ -61,6 +61,9 @@ class View(MarkupMixin):
     def process_callback(self, callback):
         pass
 
+    def process_photo(self, photo):
+        pass
+
     def activate(self):
         self.deactivate()
         for v in self.ctx.views.values():
@@ -747,6 +750,10 @@ class MailingView(NavigationView):
         else:
             for convo in self.ctx.db.convos.find({'bot_token': self.token}):
                 gevent.spawn(apihelper.send_message, self.token, convo['chat_id'], message, reply_markup=None, parse_mode='HTML')
+
+    def process_photo(self, photo, caption=None):
+        for convo in self.ctx.db.convos.find({'bot_token': self.token}):
+            gevent.spawn(apihelper.send_photo, self.token, convo['chat_id'], photo, caption, reply_markup=None)
 
 
 class SelectBotOrdersView(NavigationView):
