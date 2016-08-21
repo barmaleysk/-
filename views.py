@@ -893,7 +893,7 @@ class SettingsView(NavigationView):
             'Контакты': ['settings_view', self.token, 'contacts_view'],
             'Минимальная сумма заказа': ['settings_view', self.token, 'total_threshold_view'],
             'Личный кабинет': ['settings_view', self.token, 'cabinet_view'],
-            'Назад': ['main_view']
+            'Назад': ['settings_view']
         }
         self.message_id = None
         # if self.token not in self.views:
