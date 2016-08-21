@@ -105,13 +105,13 @@ class MainConvo(Convo):
             links={
                 "Добавить магазин": ['add_view'],
                 "Настройки": ['settings_view'],
-                "Заказы": ['select_bot_orders_view'],
+                "Заказы": ['orders_view'],
                 "Помощь": ['help_view'],
                 "Рассылка новостей": ['mailing_view']
             },
             msg="Главное меню"
         )
-        self.views['help_view'] = HelpView(self, links={'Главное меню': ['main_view']})
+        self.views['help_view'] = HelpView(self, links={'Назад': ['main_view']})
         self.views['add_view'] = BotCreatorView(self, [
             TokenDetail('shop.token', name='API token.', desc='Для этого перейдите в @BotFather и нажмите /newbot для создания бота. Придумайте название бота (должно быть на русском языке) и ссылку на бот (на английском языке и заканчиваться на bot). Далее вы увидите API token, который нужно скопировать и отправить в этот чат.', ctx=self),
             EmailDetail('shop.email', name='email для приема заказов', ctx=self),
@@ -120,9 +120,9 @@ class MainConvo(Convo):
             TextDetail('shop.contacts_info', name='текст с контактами для связи', value='telegram: @' + str(self.bot.bot.get_chat(self.chat_id).username)),
             NumberDetail('shop.total_threshold', name='минимальную сумму заказа', value='0')
         ], final_message='Магазин создан!')
-        self.views['settings_view'] = BotSettingsView(self, msg='Настройки', links={'Главное меню': ['main_view']})
-        self.views['select_bot_orders_view'] = SelectBotOrdersView(self, msg='Выберите магазин')
-        self.views['mailing_view'] = SelectBotMailingView(self, msg='Рассылка новостей', links={'Главное меню': ['main_view']})
+        self.views['settings_view'] = SelectBotView(self, bot_view={'link': 'settings_view', 'view': SettingsView})
+        self.views['orders_view'] = SelectBotView(self, bot_view={'link': 'orders_view', 'view': OrdersView})
+        self.views['mailing_view'] = SelectBotView(self, bot_view={'link': 'mailing_view', 'view': MailingView})
         self.path = data.get('path')
         if not self.get_current_view():
             self.route(['main_view'])
