@@ -8,6 +8,9 @@ import requests
 import json
 
 
+WED_ADMIN_DOMAIN = open('domain').read()
+
+
 def get_address(lat, lng):
     resp = requests.get('http://maps.googleapis.com/maps/api/geocode/json?latlng=' + str(lat) + ',' + str(lng) + '&language=ru')
     return json.loads(resp.content).get('results')[0].get('formatted_address')

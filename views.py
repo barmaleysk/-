@@ -10,13 +10,13 @@ import pymongo
 from io import BytesIO
 from StringIO import StringIO
 from datetime import datetime
-from utils import Mailer, striphtml
+from utils import Mailer, striphtml, WED_ADMIN_DOMAIN
 from collections import defaultdict
 from vk_crawler import Crawler
 from pyexcel_xls import get_data
 import pandas as pd
 import md5
-from datetime import datetime
+from time import time
 
 
 class MarkupMixin(object):
@@ -325,7 +325,6 @@ class DetailsView(View):
         elif isinstance(self.current(), FileDetail):
             if 'vk.com' in cmd:
                 try:
-                    # self.ctx.redis.publish('vk_input', json.dumps({'token': self.ctx.token, 'chat_id': self.ctx.chat_id, 'url': cmd}))
                     gevent.spawn(self.analyze_vk_link, cmd)
                     self.ctx.send_message('Анализирую..')
                     self.ctx.tmpdata = None
@@ -340,6 +339,8 @@ class BotCreatorView(DetailsView):
 
     def bot_data(self):
         dd = self.details_dict()
+        link = md5.new()
+        link.update(dd['shop.token'] + dd['shop.token'][::-1])
         return {
             'admin': self.ctx.bot.bot.get_chat(self.ctx.chat_id).username,
             'token': dd['shop.token'],
@@ -348,7 +349,8 @@ class BotCreatorView(DetailsView):
             'chat_id': self.ctx.chat_id,
             'delivery_info': dd['shop.delivery_info'],
             'contacts_info': dd['shop.contacts_info'],
-            'total_threshold': dd['shop.total_threshold']
+            'total_threshold': dd['shop.total_threshold'],
+            'link': link.hexdigest()
         }
 
     def finalize(self):
@@ -930,9 +932,9 @@ class CabinetView(NavigationView):
         if cmd == 'Получить ссылку':
             first_part = md5.new()
             second_part = md5.new()
-            first_part.update(self.token + str(datetime.now().hour))
+            first_part.update(str(int(time() / 60 / 60)))
             second_part.update(self.token + self.token[::-1])
-            link = '<a href="http://test.com/' + first_part.hexdigest() + second_part.hexdigest() + '">Личный кабинет</a>'
+            link = WED_ADMIN_DOMAIN + first_part.hexdigest() + second_part.hexdigest()
             self.ctx.send_message(link)
         elif cmd == 'Назад':
             self.ctx.route(['settings_view', self.token])
