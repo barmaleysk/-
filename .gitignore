@@ -8,3 +8,4 @@ main.py
 *.log
 token.dev
 token
+domain
