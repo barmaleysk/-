@@ -234,7 +234,7 @@ class MasterBot(MarketBot):
     convo_type = MainConvo
 
     def process_message(self, message):
-        gevent.spawn(botan.track, botan_token, message.chat.id, {}, message.text)
+        gevent.spawn(botan.track, botan_token, message.chat.id, {'from_user': message.from_user.username}, message.text)
         super(MasterBot, self).process_message(message)
 
     def __init__(self, data):
