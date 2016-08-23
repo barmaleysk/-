@@ -8,7 +8,7 @@ import requests
 import json
 
 
-WED_ADMIN_DOMAIN = open('domain').read()
+WED_ADMIN_DOMAIN = open('domain').read().split('\n')[0]
 
 
 def get_address(lat, lng):
