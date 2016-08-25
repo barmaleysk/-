@@ -29,7 +29,7 @@ class Convo(object):
     def get_bot_data(self):
         return self.db.bots.find_one({'token': self.token})
 
-    def _send_msg(sel, msg1, markup):
+    def _send_msg(self, msg1, markup):
         try:
             apihelper.send_message(self.token, self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
         except Exception, e:
