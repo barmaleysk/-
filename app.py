@@ -152,8 +152,9 @@ class Bot(object):
             bot.remove_webhook()
             # print 'registered bot at', self.WEBHOOK_URL_BASE + '/' + bot.token + '/'
             bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(self.WEBHOOK_SSL_CERT, 'r'))
-        except:
-            pass
+        except Exception, e:
+            print e
+            print self.token
 
 
 class MarketBot(Bot):
