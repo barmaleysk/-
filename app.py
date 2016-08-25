@@ -29,10 +29,16 @@ class Convo(object):
     def get_bot_data(self):
         return self.db.bots.find_one({'token': self.token})
 
+    def _send_msg(sel, msg1, markup):
+        try:
+            apihelper.send_message(self.token, self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
+        except:
+            pass
+
     def send_message(self, msg, markup=None):
         if self.chat_id:
             msg1 = msg.replace('<br />', '.\n')
-            gevent.spawn(apihelper.send_message, self.token, self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
+            gevent.spawn(self._send_msg, msg1, markup)
             return
 
     def edit_message(self, message_id, msg, markup=None):
