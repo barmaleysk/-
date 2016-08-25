@@ -32,8 +32,8 @@ class Convo(object):
     def _send_msg(sel, msg1, markup):
         try:
             apihelper.send_message(self.token, self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
-        except:
-            pass
+        except Exception, e:
+            print e
 
     def send_message(self, msg, markup=None):
         if self.chat_id:
