@@ -33,7 +33,7 @@ class Convo(object):
         try:
             apihelper.send_message(self.token, self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
         except Exception, e:
-            print e
+            self.bot.log_error({'func': '_send_msg', 'token': self.token, 'chat_id': self.chat_id, 'message': message, 'error': str(e)})
 
     def send_message(self, msg, markup=None):
         if self.chat_id:
@@ -146,15 +146,16 @@ class Bot(object):
         Bot.bots[self.token] = self
         gevent.spawn(self.set_webhook, self.token)
 
+    def log_error(self, e):
+        pass
+
     def set_webhook(self, token):
         try:
             bot = telebot.TeleBot(token)
             bot.remove_webhook()
-            # print 'registered bot at', self.WEBHOOK_URL_BASE + '/' + bot.token + '/'
             bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(self.WEBHOOK_SSL_CERT, 'r'))
         except Exception, e:
-            print e
-            print self.token
+            self.log_error(e)
 
 
 class MarketBot(Bot):
@@ -172,6 +173,9 @@ class MarketBot(Bot):
         self._init_bot()
         for convo_data in self.db.convos.find({'bot_token': self.token}):
             self.init_convo(convo_data)
+
+    def log_error(self, e):
+        gevent.spawn(self.db.errors.insert_one, {'error': str(e)})
 
     def _init_bot(self, threaded=False):
         self.bot = telebot.TeleBot(self.token, threaded=threaded, skip_pending=True)
@@ -207,7 +211,6 @@ class MarketBot(Bot):
 
     def start_bot(self, bot_data):
         MarketBot(bot_data, self.db)
-        print Bot.bots
 
     def process_file(self, doc):
         convo = self.get_convo(doc.chat.id)
@@ -252,8 +255,7 @@ class MasterBot(MarketBot):
                 try:
                     MarketBot(bot_data, self.db)
                 except Exception, e:
-                    print e
-        print Bot.bots
+                    self.log_error(e)
 
     def route_update(self, token, update):
         if token in Bot.bots:
