@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from collections import OrderedDict
 import gevent
 from gevent import monkey; monkey.patch_all()
 from telebot import types
@@ -109,7 +110,7 @@ class NavigationView(View):
         super(NavigationView, self).__init__(ctx, False, msg)
 
     def get_markup(self):
-        return self.mk_markup(sorted([l.decode('utf-8') for l in self.links.keys()]))
+        return self.mk_markup([l.decode('utf-8') for l in self.links.keys()])
 
     def process_message(self, message):
         if message in self.links:
@@ -759,7 +760,7 @@ class MenuCatView(InlineNavigationView):
             self.categories[item_data['cat'].split('.')[0][:80]].append(item_data)  # TODO HACK
         if u'' in self.categories:
             del self.categories[u'']
-        self.links = {cat: ['menu_cat_view', cat] for cat in self.categories.keys()}
+        self.links = OrderedDict([(cat, ['menu_cat_view', cat]) for cat in self.categories.keys()])
         self.views = {cat: MenuNode(cat, items, self.ctx, links={"delivery": ['delivery']}) for cat, items in self.categories.items()}
 
     def process_message(self, cmd):
@@ -853,7 +854,7 @@ class SelectBotView(NavigationView):
         return super(SelectBotView, self).get_subview(token)
 
     def activate(self):
-        self.links = {}
+        self.links = OrderedDict()
         self.views = {}
         for bot in self.ctx.db.bots.find({'chat_id': self.ctx.chat_id}):
             self.links['@' + bot['username']] = [self.bot_view['link'], bot['token']]
@@ -867,11 +868,11 @@ class OrdersView(NavigationView):
         self.token = bot_token
         self.editable = True
         self.msg = 'Выберите статус заказа'
-        self.links = {
-            'В обработке': ['orders_view', self.token, 'in_processing'],
-            'Завершенные': ['orders_view', self.token, 'done'],
-            "Назад": ['orders_view']
-        }
+        self.links = OrderedDict([
+            ('В обработке', ['orders_view', self.token, 'in_processing']),
+            ('Завершенные', ['orders_view', self.token, 'done']),
+            ("Назад", ['orders_view'])
+        ])
         self.message_id = None
         self.views = {
             'in_processing': AdminOrderView(self.ctx, self.token, status=u'В обработке'),
@@ -885,16 +886,16 @@ class SettingsView(NavigationView):
         self.token = bot_token
         self.editable = True
         self.msg = 'Настройки'
-        self.links = {
-            'API token': ['settings_view', self.token, 'token_view'],
-            'E-mail': ['settings_view', self.token, 'email_view'],
-            'Загрузка товаров': ['settings_view', self.token, 'items_view'],
-            'Условия доставки': ['settings_view', self.token, 'delivery_info_view'],
-            'Контакты': ['settings_view', self.token, 'contacts_view'],
-            'Минимальная сумма заказа': ['settings_view', self.token, 'total_threshold_view'],
-            'Личный кабинет': ['settings_view', self.token, 'cabinet_view'],
-            'Назад': ['settings_view']
-        }
+        self.links = OrderedDict([
+            ('API token', ['settings_view', self.token, 'token_view']),
+            ('E-mail', ['settings_view', self.token, 'email_view']),
+            ('Загрузка товаров', ['settings_view', self.token, 'items_view']),
+            ('Условия доставки', ['settings_view', self.token, 'delivery_info_view']),
+            ('Минимальная сумма заказа', ['settings_view', self.token, 'total_threshold_view']),
+            ('Контакты', ['settings_view', self.token, 'contacts_view']),
+            ('Личный кабинет', ['settings_view', self.token, 'cabinet_view']),
+            ('Назад', ['settings_view'])]
+        )
         self.message_id = None
         # if self.token not in self.views:
         bot = self.ctx.db.bots.find_one({'chat_id': self.ctx.chat_id, 'token': self.token})
@@ -908,8 +909,11 @@ class SettingsView(NavigationView):
             'cabinet_view': CabinetView(self.ctx, self.token)
         }
 
-    def get_markup(self):
-        return self.mk_markup(sorted([l.decode('utf-8') for l in self.links.keys()]))
+    def mk_markup(self, command_list):
+        markup = types.ReplyKeyboardMarkup(row_width=2)
+        btns = [self.BTN(cmd) for cmd in command_list]
+        markup.add(*btns)
+        return markup
 
 
 class CabinetView(NavigationView):

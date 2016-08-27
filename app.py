@@ -86,12 +86,12 @@ class MarketBotConvo(Convo):
         self.views['order_info'] = OrderInfoView(self, msg="Тут должны быть условия доставки", links={'Главное меню': ['main_view']})
         self.views['contacts'] = ContactsInfoView(self, links={'Главное меню': ['main_view']})
         self.views['history'] = HistoryView(self)
-        self.views['main_view'] = NavigationView(self, links={
-            "Меню": ['menu_cat_view'],
-            "История": ['history'],
-            "Доставка": ['order_info'],   # ,
-            "Контакты": ['contacts']   # ContactsInfoView(self.ctx)
-        }, msg="Главное меню")
+        self.views['main_view'] = NavigationView(self, links=OrderedDict([
+            ("Меню", ['menu_cat_view']),
+            ("История", ['history']),
+            ("Доставка", ['order_info']),   # ,
+            ("Контакты", ['contacts'])   # ContactsInfoView(self.ctx)
+        ]), msg="Главное меню")
         self.path = data.get('path')
         if not self.get_current_view():
             self.route(['main_view'])
@@ -102,13 +102,13 @@ class MainConvo(Convo):
         super(MainConvo, self).__init__(data, bot)
         self.views['main_view'] = NavigationView(
             self,
-            links={
-                "Добавить магазин": ['add_view'],
-                "Настройки": ['settings_view'],
-                "Заказы": ['orders_view'],
-                "Помощь": ['help_view'],
-                "Рассылка новостей": ['mailing_view']
-            },
+            links=OrderedDict([
+                ("Добавить магазин", ['add_view']),
+                ("Заказы", ['orders_view']),
+                ("Настройки", ['settings_view']),
+                ("Помощь", ['help_view']),
+                ("Рассылка новостей", ['mailing_view'])
+            ]),
             msg="Главное меню"
         )
         self.views['help_view'] = HelpView(self, links={'Назад': ['main_view']})
