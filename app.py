@@ -100,15 +100,21 @@ class MarketBotConvo(Convo):
 class MainConvo(Convo):
     def __init__(self, data, bot):
         super(MainConvo, self).__init__(data, bot)
-        self.views['main_view'] = NavigationView(
-            self,
-            links=OrderedDict([
+        links = OrderedDict([
+                            ("Добавить магазин", ['add_view']),
+                            ("Помощь", ['help_view']),
+                            ])
+        if self.db.bots.find_one() is not None:
+            links = OrderedDict([
                 ("Добавить магазин", ['add_view']),
                 ("Заказы", ['orders_view']),
                 ("Настройки", ['settings_view']),
                 ("Помощь", ['help_view']),
                 ("Рассылка новостей", ['mailing_view'])
-            ]),
+            ])
+        self.views['main_view'] = NavigationView(
+            self,
+            links=links,
             msg="Главное меню"
         )
         self.views['help_view'] = HelpView(self, links={'Назад': ['main_view']})
@@ -144,7 +150,6 @@ class Bot(object):
         try:
             bot = telebot.TeleBot(token)
             bot.remove_webhook()
-            # print 'registered bot at', self.WEBHOOK_URL_BASE + '/' + bot.token + '/'
             bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(self.WEBHOOK_SSL_CERT, 'r'))
         except:
             pass

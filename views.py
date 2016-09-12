@@ -336,6 +336,7 @@ class DetailsView(View):
 
 class BotCreatorView(DetailsView):
     def prefinalize(self):
+
         self._final_message = self.final_message
         self.final_message += '\n Ссылка на бота: @' + telebot.TeleBot(self.details_dict()['shop.token']).get_me().username.encode('utf-8')
 
@@ -351,6 +352,29 @@ class BotCreatorView(DetailsView):
             'contacts_info': dd['shop.contacts_info'],
             'total_threshold': dd['shop.total_threshold']
         }
+
+    def next(self):
+        if self.ptr + 1 < len(self.details):
+            if self.current().is_filled():
+                self.ptr += 1
+            self.render()
+        else:
+            self.filled = True
+            self.prefinalize()
+            self.ctx.views['main_view'] = NavigationView(
+                self.ctx,
+                links=OrderedDict([
+                    ("Добавить магазин", ['add_view']),
+                    ("Заказы", ['orders_view']),
+                    ("Настройки", ['settings_view']),
+                    ("Помощь", ['help_view']),
+                    ("Рассылка новостей", ['mailing_view'])
+                ]),
+                msg="Главное меню"
+            )
+            self.render()
+            self.ctx.route(['main_view'])
+            self.finalize()
 
     def finalize(self):
         self.final_message = self._final_message
