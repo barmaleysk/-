@@ -33,7 +33,7 @@ class Convo(object):
         try:
             apihelper.send_message(self.token, self.chat_id, msg1, reply_markup=markup, parse_mode='HTML')
         except Exception, e:
-            self.bot.log_error({'func': '_send_msg', 'token': self.token, 'chat_id': self.chat_id, 'message': message, 'error': str(e)})
+            self.bot.log_error({'func': '_send_msg', 'token': self.token, 'chat_id': self.chat_id, 'message': msg1, 'error': str(e)})
 
     def send_message(self, msg, markup=None):
         if self.chat_id:
