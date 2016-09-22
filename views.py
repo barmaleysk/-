@@ -335,7 +335,7 @@ class DetailsView(View):
 class BotCreatorView(DetailsView):
     def prefinalize(self):
         self._final_message = self.final_message
-        self.final_message += '\n Ссылка на бота: @' + telebot.TeleBot(self.details_dict()['shop.token']).get_me().username.encode('utf-8')
+        self.final_message += '\n Ссылка на бота: @' + telebot.TeleBot(self.details_dict().get('shop.token') or self.token).get_me().username.encode('utf-8')
 
     def bot_data(self):
         dd = self.details_dict()
