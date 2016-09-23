@@ -7,6 +7,7 @@ from pymongo import MongoClient
 from views import *
 from utils import get_address
 import botan
+import time
 
 botan_token = 'BLe0W1GY8SwbNijJ0H-lroERrA9BnK0t'
 
@@ -149,7 +150,7 @@ class Bot(object):
     def log_error(self, e):
         pass
 
-    def set_webhook(self, token):
+    def set_webhook(self, token, retries=0):
         try:
             bot = telebot.TeleBot(token)
             bot.remove_webhook()
@@ -158,6 +159,10 @@ class Bot(object):
         except Exception, e:
             self.log_error(e)
             print token, e
+            if retries < 2:
+                time.sleep(1)
+                self.set_webhook(token, rerties+1)
+
 
 
 class MarketBot(Bot):
