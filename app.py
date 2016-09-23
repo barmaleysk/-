@@ -157,7 +157,7 @@ class Bot(object):
             print token, 'registered'
         except Exception, e:
             self.log_error(e)
-            print e
+            print token, e
 
 
 class MarketBot(Bot):
