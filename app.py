@@ -154,8 +154,10 @@ class Bot(object):
             bot = telebot.TeleBot(token)
             bot.remove_webhook()
             bot.set_webhook(url=self.WEBHOOK_URL_BASE + '/' + bot.token + '/', certificate=open(self.WEBHOOK_SSL_CERT, 'r'))
+            print token, 'registered'
         except Exception, e:
             self.log_error(e)
+            print e
 
 
 class MarketBot(Bot):
