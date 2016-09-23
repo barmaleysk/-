@@ -161,7 +161,7 @@ class Bot(object):
             print token, e
             if retries < 2:
                 time.sleep(1)
-                self.set_webhook(token, rerties+1)
+                self.set_webhook(token, retries+1)
 
 
 
